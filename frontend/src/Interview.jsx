@@ -669,20 +669,19 @@ export default function Interview() {
           <div className="flex gap-3 mt-3">
             {!feedback ? (
               <button onClick={submitAnswer} disabled={loading || !answer.trim()}
-                className="w-full py-3 rounded-xl font-semibold text-white transition-all bg-blue-600 hover:bg-blue-700 shadow-md">
+                className="w-full py-3 rounded-xl font-semibold text-white transition-all transform active:scale-[0.97] bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg">
                 {loading ? '⏳ AI深度评估...' : '📊 提交评估'}
               </button>
             ) : (
-              <div className="flex gap-3">
-                {!allDone && (
+              <div className="flex gap-3 w-full">
+                {!allDone ? (
                   <button onClick={nextQuestion}
-                    className="flex-1 py-3 rounded-xl font-semibold text-white shadow-md transition-all bg-green-600 hover:bg-green-700">
+                    className="w-full py-3 rounded-xl font-semibold bg-green-600 text-white hover:bg-green-700 shadow-md hover:shadow-lg transition-all transform active:scale-[0.97]">
                     ➡️ 下一题
                   </button>
-                )}
-                {allDone && (
+                ) : (
                   <button onClick={finishInterview}
-                    className="flex-1 py-3 rounded-xl font-semibold bg-blue-600 text-white shadow-md hover:bg-blue-700 transition-all">
+                    className="w-full py-3 rounded-xl font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg transition-all transform active:scale-[0.97]">
                     📊 查看面试总结报告
                   </button>
                 )}
@@ -778,8 +777,15 @@ export default function Interview() {
           )}
 
           {feedback && feedback._isPlainText && (
-            <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed p-4 bg-slate-50 rounded-lg">
-              {feedback.raw_text || JSON.stringify(feedback, null, 2)}
+            <div className="bg-white rounded-xl shadow-sm border border-amber-200 p-6 animate-fadeIn">
+              <div className="text-center mb-4">
+                <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-amber-100 text-amber-700 rounded-full text-xs font-medium mb-2">
+                  ⚠️ 反馈为文字模式
+                </div>
+              </div>
+              <div className="prose prose-sm max-w-none text-slate-700 whitespace-pre-wrap leading-relaxed">
+                {feedback.raw_text || JSON.stringify(feedback, null, 2)}
+              </div>
             </div>
           )}
           {feedback && typeof feedback === 'string' && (
