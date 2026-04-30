@@ -114,6 +114,46 @@ export default function Interview() {
     }
   };
 
+  const generateSummary = async () => {
+    setSummaryLoading(true);
+    setError('');
+    try {
+      const answerData = history.map(h => ({
+        question: h.question,
+        score: h.feedback?.score || 0,
+        strengths: h.feedback?.strengths || [],
+        weaknesses: h.feedback?.weaknesses || []
+      }));
+      const res = await fetch(`${API_BASE}/api/interview/summary`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ answers: answerData, position, domain })
+      });
+      const d = await res.json();
+      if (d.success) setSummary(d.data);
+      else setSummary({ raw_text: d.error || '生成总结失败' });
+    } catch (e) { setSummary({ raw_text: '网络错误' }); }
+    setSummaryLoading(false);
+    setShowSummary(true);
+  };
+
+  const loadPreparation = async () => {
+    setPrepLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_BASE}/api/interview/preparation`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ position, domain, company })
+      });
+      const d = await res.json();
+      if (d.success) setPrepData(d.data);
+      else setPrepData({ raw_text: d.error || '获取失败' });
+    } catch (e) { setPrepData({ raw_text: '网络错误' }); }
+    setPrepLoading(false);
+    setShowPrep(true);
+  };
+
   const toggleVoice = () => {
     if (isRecording) stopVoiceInput();
     else startVoiceInput();
@@ -189,6 +229,10 @@ export default function Interview() {
       const d = await res.json();
       if (d.success) {
         setFeedback(d.data);
+      // If feedback is plain text (not JSON), still display it nicely
+      if (typeof d.data === 'string') {
+        setFeedback({ raw_text: d.data, _isPlainText: true });
+      }
         setHistory(prev => [...prev, { q: currentQ, question: q.question, answer, feedback: d.data }]);
       } else setError(d.error || '评分失败');
     } catch (e) { setError('网络错误'); }
@@ -205,6 +249,250 @@ export default function Interview() {
 
   const q = questions[currentQ];
   const timerColor = timer > 120 ? 'text-slate-600' : timer > 60 ? 'text-orange-500' : 'text-red-500 animate-pulse';
+
+  // ===== Summary View =====
+  if (showSummary) {
+    const s = summary;
+    const isObj = s && typeof s === 'object' && !s._isPlainText && !s.raw_text;
+    return (
+      <div className="animate-fadeIn max-w-3xl mx-auto">
+        <div className="text-center mb-6">
+          <h2 className="text-2xl font-bold text-slate-800">📊 面试总结报告</h2>
+          <p className="text-slate-500 text-sm mt-1">
+            {position} · {domain || '不限'} · {company || ''} · {MODE_DETAILS[mode].label}
+          </p>
+        </div>
+
+        {summaryLoading && (
+          <div className="text-center py-16 text-slate-400">
+            <div className="animate-spin text-5xl mb-4">⏳</div>
+            <p>AI 正在生成面试总结...</p>
+          </div>
+        )}
+
+        {isObj && (
+          <div className="space-y-4">
+            {/* Overall Score */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 text-center">
+              <div className="text-5xl font-bold" style={{color: (s.overall_score || 0) >= 7 ? '#16a34a' : (s.overall_score || 0) >= 4 ? '#ca8a04' : '#dc2626'}}>
+                {s.overall_score || 0}/10
+              </div>
+              <p className="text-sm text-slate-500 mt-1">综合评分（{s.total_questions || history.length}题平均）</p>
+              {s.overall_assessment && <p className="text-sm text-slate-600 mt-3 max-w-lg mx-auto">{s.overall_assessment}</p>}
+            </div>
+
+            {/* Dimension Averages */}
+            {s.dimension_averages && (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+                <h3 className="font-semibold text-slate-700 mb-3">📈 各维度平均分</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {Object.entries(s.dimension_averages).map(([k, v]) => (
+                    <div key={k} className="bg-slate-50 p-3 rounded-lg">
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-slate-600">{({'professional':'专业能力','communication':'沟通表达','logic':'逻辑思维','fit':'岗位匹配'})[k]||k}</span>
+                        <span className="font-semibold" style={{color: v >= 7 ? '#16a34a' : '#ca8a04'}}>{v}/10</span>
+                      </div>
+                      <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
+                        <div className="h-full bg-blue-500 rounded-full" style={{width: `${v * 10}%`}}></div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Strengths & Improvements */}
+            <div className="grid grid-cols-2 gap-4">
+              {s.top_strengths?.length > 0 && (
+                <div className="bg-white rounded-xl shadow-sm border border-green-200 p-5">
+                  <h3 className="font-semibold text-green-700 mb-2">✅ 整体优势</h3>
+                  <ul className="space-y-1.5">
+                    {s.top_strengths.map((st, i) => <li key={i} className="text-sm text-slate-700 flex gap-2"><span className="text-green-500">✓</span>{st}</li>)}
+                  </ul>
+                </div>
+              )}
+              {s.key_improvements?.length > 0 && (
+                <div className="bg-white rounded-xl shadow-sm border border-orange-200 p-5">
+                  <h3 className="font-semibold text-orange-700 mb-2">📈 提升方向</h3>
+                  <ul className="space-y-1.5">
+                    {s.key_improvements.map((imp, i) => <li key={i} className="text-sm text-slate-700 flex gap-2"><span className="text-orange-500">!</span>{imp}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+
+            {/* Action Plan */}
+            {s.action_plan && (
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+                <h3 className="font-semibold text-slate-700 mb-3">🎯 改进计划</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  {s.action_plan.immediate && <PlanCard title="🟢 立即行动" content={s.action_plan.immediate} color="green" />}
+                  {s.action_plan.short_term && <PlanCard title="🟡 短期提升(1-2周)" content={s.action_plan.short_term} color="yellow" />}
+                  {s.action_plan.long_term && <PlanCard title="🔵 长期发展" content={s.action_plan.long_term} color="blue" />}
+                </div>
+              </div>
+            )}
+
+            {/* Etiquette & Follow-up */}
+            <div className="grid grid-cols-2 gap-4">
+              {s.etiquette_feedback && (
+                <div className="bg-white rounded-xl shadow-sm border border-purple-200 p-5">
+                  <h3 className="font-semibold text-purple-700 mb-2">🎩 面试礼仪建议</h3>
+                  <p className="text-sm text-slate-700 leading-relaxed">{s.etiquette_feedback}</p>
+                </div>
+              )}
+              {s.follow_up_advice && (
+                <div className="bg-white rounded-xl shadow-sm border border-blue-200 p-5">
+                  <h3 className="font-semibold text-blue-700 mb-2">📧 面试后续跟进</h3>
+                  <p className="text-sm text-slate-700 leading-relaxed">{s.follow_up_advice}</p>
+                </div>
+              )}
+            </div>
+
+            {/* Score History */}
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+              <h3 className="font-semibold text-slate-700 mb-3">📝 各题得分</h3>
+              <div className="space-y-2">
+                {history.map((h, i) => (
+                  <div key={i} className="flex items-center gap-3 p-2 bg-slate-50 rounded-lg">
+                    <span className="text-xs font-medium w-6 h-6 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center">{i+1}</span>
+                    <span className="text-xs text-slate-600 flex-1 truncate">{h.question.slice(0, 50)}</span>
+                    <span className={`text-sm font-bold ${(h.feedback?.score || 0) >= 7 ? 'text-green-600' : 'text-orange-600'}`}>{h.feedback?.score || 0}/10</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-center">
+              <button onClick={() => { setShowSummary(false); setStep('setup'); }}
+                className="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold shadow-md hover:bg-blue-700 transition-all">
+                🔄 再来一次
+              </button>
+              <button onClick={loadPreparation}
+                className="px-6 py-3 bg-green-600 text-white rounded-xl font-semibold shadow-md hover:bg-green-700 transition-all">
+                📋 面试全流程指南
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Plain text fallback */}
+        {s && (s._isPlainText || s.raw_text) && (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{s.raw_text || JSON.stringify(s, null, 2)}</div>
+            <button onClick={() => { setShowSummary(false); setStep('setup'); }}
+              className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold">🔄 再来一次</button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ===== Preparation View =====
+  if (showPrep) {
+    const p = prepData;
+    const isObj = p && typeof p === 'object' && !p._isPlainText && !p.raw_text;
+    return (
+      <div className="animate-fadeIn max-w-3xl mx-auto">
+        <div className="text-center mb-6">
+          <h2 className="text-2xl font-bold text-slate-800">📋 面试全流程指南</h2>
+          <p className="text-slate-500 text-sm mt-1">{position} · {domain || '不限'} · {company || '不限'}</p>
+        </div>
+
+        {prepLoading && (
+          <div className="text-center py-16 text-slate-400">
+            <div className="animate-spin text-5xl mb-4">⏳</div>
+            <p>AI 正在生成面试指南...</p>
+          </div>
+        )}
+
+        {isObj && (
+          <div className="space-y-4">
+            {/* Before Interview */}
+            {p.before_interview && (
+              <div className="bg-white rounded-xl shadow-sm border border-blue-200 p-5">
+                <h3 className="font-semibold text-blue-700 mb-3">📝 面试前准备</h3>
+                <div className="space-y-2 text-sm text-slate-700">
+                  {p.before_interview.dress_code && <p><strong>👔 着装建议：</strong>{p.before_interview.dress_code}</p>}
+                  {p.before_interview.preparation && <p><strong>📚 准备工作：</strong>{p.before_interview.preparation}</p>}
+                  {p.before_interview.company_research && <p><strong>🔍 公司研究：</strong>{p.before_interview.company_research}</p>}
+                  {p.before_interview.materials_to_bring && <p><strong>🎒 携带材料：</strong>{p.before_interview.materials_to_bring}</p>}
+                  {p.before_interview.common_questions?.length > 0 && (
+                    <div><strong>❓ 常见问题：</strong>
+                      <ul className="list-disc list-inside mt-1 space-y-1">
+                        {p.before_interview.common_questions.map((q, i) => <li key={i}>{q}</li>)}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* During Interview */}
+            {p.during_interview && (
+              <div className="bg-white rounded-xl shadow-sm border border-green-200 p-5">
+                <h3 className="font-semibold text-green-700 mb-3">🎤 面试中表现</h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  {p.during_interview.etiquette && <InfoCard title="🎩 礼仪" content={p.during_interview.etiquette} />}
+                  {p.during_interview.self_introduction && <InfoCard title="🗣️ 自我介绍" content={p.during_interview.self_introduction} />}
+                  {p.during_interview.answering_skills && <InfoCard title="💡 答题技巧" content={p.during_interview.answering_skills} />}
+                  {p.during_interview.body_language && <InfoCard title="🧍 肢体语言" content={p.during_interview.body_language} />}
+                  {p.during_interview.questions_to_ask && (
+                    <div className="col-span-2 bg-blue-50 p-3 rounded-lg">
+                      <strong>🙋 可以反问面试官的问题：</strong>
+                      <p className="mt-1">{p.during_interview.questions_to_ask}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* After Interview */}
+            {p.after_interview && (
+              <div className="bg-white rounded-xl shadow-sm border border-purple-200 p-5">
+                <h3 className="font-semibold text-purple-700 mb-3">📧 面试后跟进</h3>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  {p.after_interview.follow_up && <InfoCard title="📩 跟进方式" content={p.after_interview.follow_up} />}
+                  {p.after_interview.thank_you_note && <InfoCard title="✉️ 感谢信" content={p.after_interview.thank_you_note} />}
+                  {p.after_interview.next_steps && <InfoCard title="➡️ 后续安排" content={p.after_interview.next_steps} />}
+                  {p.after_interview.negotiation && <InfoCard title="💰 谈薪技巧" content={p.after_interview.negotiation} />}
+                  {p.after_interview.if_rejected && (
+                    <div className="col-span-2 bg-orange-50 p-3 rounded-lg">
+                      <strong>😌 被拒后：</strong>
+                      <p className="mt-1">{p.after_interview.if_rejected}</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Common Mistakes */}
+            {p.common_mistakes?.length > 0 && (
+              <div className="bg-white rounded-xl shadow-sm border border-red-200 p-5">
+                <h3 className="font-semibold text-red-700 mb-2">⚠️ 面试常见错误</h3>
+                <ul className="space-y-1">
+                  {p.common_mistakes.map((m, i) => <li key={i} className="text-sm text-slate-700 flex gap-2"><span className="text-red-500">•</span>{m}</li>)}
+                </ul>
+              </div>
+            )}
+
+            <div className="flex gap-3 justify-center">
+              <button onClick={() => { setShowPrep(false); }}
+                className="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold shadow-md hover:bg-blue-700">⬅️ 返回结果</button>
+              <button onClick={() => { setShowPrep(false); setShowSummary(false); setStep('setup'); }}
+                className="px-6 py-3 bg-green-600 text-white rounded-xl font-semibold shadow-md hover:bg-green-700">🔄 开始新面试</button>
+            </div>
+          </div>
+        )}
+
+        {p && (p._isPlainText || p.raw_text) && (
+          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+            <div className="text-sm text-slate-700 whitespace-pre-wrap">{p.raw_text || JSON.stringify(p, null, 2)}</div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   // ===== Setup View =====
   if (step === 'setup') {
@@ -469,6 +757,27 @@ export default function Interview() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+
+// Helper components for summary/prep views
+function PlanCard({ title, content, color }) {
+  const colors = { green: 'border-green-200 bg-green-50', yellow: 'border-yellow-200 bg-yellow-50', blue: 'border-blue-200 bg-blue-50' };
+  return (
+    <div className={`p-3 rounded-lg border ${colors[color] || colors.blue}`}>
+      <h4 className="font-semibold text-xs mb-1">{title}</h4>
+      <p className="text-xs text-slate-700 leading-relaxed">{content}</p>
+    </div>
+  );
+}
+
+function InfoCard({ title, content }) {
+  return (
+    <div className="bg-slate-50 p-3 rounded-lg">
+      <strong className="text-xs block mb-0.5">{title}</strong>
+      <p className="text-xs text-slate-600">{content}</p>
     </div>
   );
 }

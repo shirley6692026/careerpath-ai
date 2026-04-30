@@ -315,5 +315,105 @@ async def interview_feedback(data: InterviewAnswer):
     parsed = extract_json(r["data"])
     return {"success": True, "data": parsed or r["data"], "model_used": r["model_used"], "tokens": r["tokens"]}
 
+
+
+@app.post("/api/interview/summary")
+async def interview_summary(data: dict):
+    """面试总结：汇总所有问题的评分，给出整体评价"""
+    answers = data.get("answers", [])
+    position = data.get("position", "")
+    domain = data.get("domain", "")
+    
+    if not answers:
+        return {"success": False, "error": "没有回答记录"}
+    
+    # Build summary from all answers
+    scores = [a.get("score", 0) for a in answers if a.get("score")]
+    avg_score = round(sum(scores) / len(scores), 1) if scores else 0
+    
+    summary_prompt = f"""你是面试总结专家。基于以下{len(answers)}轮面试回答的评分和反馈，生成总结报告JSON:
+
+岗位: {position}
+行业: {domain or '不限'}
+
+各题表现:
+{chr(10).join([f'第{i+1}题: {a.get("question","")[:50]}... 评分: {a.get("score","?")}/10, 优点: {a.get("strengths",[])}' for i,a in enumerate(answers)])}
+
+返回JSON:
+{{
+  "overall_score": {avg_score},
+  "total_questions": {len(answers)},
+  "dimension_averages": {{
+    "professional": 7,
+    "communication": 7,
+    "logic": 7,
+    "fit": 6
+  }},
+  "top_strengths": ["在整个面试中表现最好的能力1", "能力2"],
+  "key_improvements": ["最需要提升的方向1", "方向2"],
+  "action_plan": {{
+    "immediate": "面试后可立即做的改进",
+    "short_term": "1-2周内可准备的方向",
+    "long_term": "长期职业发展规划建议"
+  }},
+  "overall_assessment": "对整个面试表现的总结评价（含行业针对性建议）",
+  "etiquette_feedback": "面试过程中礼仪、表达、谈吐等方面的建议",
+  "follow_up_advice": "面试结束后如何跟进、联系HR、写感谢信等建议"
+}}
+只返回JSON。"""
+    
+    r = ark_call([{"role": "system", "content": summary_prompt},
+                  {"role": "user", "content": "请生成面试总结报告"}], temp=0.3, max_tokens=4096)
+    
+    if not r["success"]: return {"success": False, "error": r["error"]}
+    parsed = extract_json(r["data"])
+    return {"success": True, "data": parsed or r["data"], "model_used": r["model_used"], "tokens": r["tokens"]}
+
+
+@app.post("/api/interview/preparation")
+async def interview_preparation(data: dict):
+    """面试准备建议：礼仪、谈吐、表达、跟进"""
+    position = data.get("position", "")
+    domain = data.get("domain", "")
+    company = data.get("company", "")
+    
+    prep_prompt = f"""你是面试指导专家。为求职者提供面试全流程建议，返回JSON:
+
+求职信息: 岗位={position}, 行业={domain or '不限'}, 公司={company or '不限'}
+
+返回JSON:
+{{
+  "before_interview": {{
+    "dress_code": "着装建议（基于行业和公司文化）",
+    "preparation": "面试前应做的准备工作清单",
+    "company_research": "如何研究目标公司",
+    "common_questions": ["常见问题1及准备思路", "问题2"],
+    "materials_to_bring": "需要携带的材料"
+  }},
+  "during_interview": {{
+    "etiquette": "面试礼仪（进门/坐姿/眼神/语速等）",
+    "self_introduction": "自我介绍的STAR框架建议",
+    "answering_skills": "回答问题的技巧（表达/逻辑/时间控制）",
+    "body_language": "肢体语言注意事项",
+    "questions_to_ask": "可以反问面试官的问题"
+  }},
+  "after_interview": {{
+    "follow_up": "面试结束后如何跟进（时间/方式/内容）",
+    "thank_you_note": "感谢信模板和发送时机",
+    "next_steps": "如果多轮面试的后续安排",
+    "negotiation": "谈薪的基本技巧和注意事项",
+    "if_rejected": "如果被拒如何正确应对"
+  }},
+  "common_mistakes": ["面试常见错误1", "错误2", "错误3"]
+}}
+只返回JSON。"""
+    
+    r = ark_call([{"role": "system", "content": prep_prompt},
+                  {"role": "user", "content": f"请为{position}岗位提供面试全流程建议"}], temp=0.3, max_tokens=4096)
+    
+    if not r["success"]: return {"success": False, "error": r["error"]}
+    parsed = extract_json(r["data"])
+    return {"success": True, "data": parsed or r["data"], "model_used": r["model_used"], "tokens": r["tokens"]}
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
