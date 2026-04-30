@@ -75,15 +75,20 @@ export default function Interview() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.lang = 'zh-CN';
-    recognition.continuous = true;
-    recognition.interimResults = true;
+    recognition.continuous = false;    // 不连续模式：一句话说完自动停
+    recognition.interimResults = false; // 只拿最终结果，不要中间结果
     
     recognition.onresult = (event) => {
-      let finalText = '';
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        finalText += event.results[i][0].transcript;
+      // 只取最后一条最终结果，避免重复累积
+      const lastResult = event.results[event.results.length - 1];
+      if (lastResult && lastResult.isFinal) {
+        const text = lastResult[0].transcript;
+        setAnswer(prev => {
+          // 如果当前文本框已有完全一样的内容则不追加
+          if (prev.trim().endsWith(text.trim())) return prev;
+          return prev ? prev + text : text;
+        });
       }
-      setAnswer(prev => prev + finalText);
     };
     
     recognition.onerror = (event) => {
