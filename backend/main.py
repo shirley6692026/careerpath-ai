@@ -1,36 +1,28 @@
 """
-CareerPath AI v3.0 - P1 Enhanced
-- JD翻译官 (含图片OCR识别)
-- 能力雷达 (增强版可迁移能力)
-- 结构化JSON解析
+CareerPath AI v3.0 - P1 Enhanced (v3.0.2)
+- 增强 OCR 预处理 (降噪/二值化/放大)
+- ARK 自动重试 + 超时控制
+- 更好的错误日志
 """
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional
-import uvicorn, json, os, shutil
+import uvicorn, json, os, re, time
 from pathlib import Path
-from PIL import Image
+from PIL import Image, ImageEnhance, ImageFilter
 import pytesseract
 import cv2
 import numpy as np
 from ark_client import client
 
-app = FastAPI(title="CareerPath AI API", version="3.0.1")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app = FastAPI(title="CareerPath AI API", version="3.0.2")
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 
-# ===== Models =====
 class JDInput(BaseModel):
     jd_text: str
 
@@ -39,45 +31,69 @@ class SkillInput(BaseModel):
     target_job: str
 
 
-# ===== OCR Helper =====
-def ocr_image(image_path: str) -> str:
-    """使用 Tesseract OCR 提取图片中的文字"""
+# ===== Enhanced OCR =====
+def ocr_image_enhanced(image_path: str) -> str:
+    """多步骤 OCR 预处理以提升文字识别质量"""
     try:
-        # Read with OpenCV for preprocessing
         img = cv2.imread(image_path)
-        # Convert to grayscale
+        if img is None:
+            # Try PIL fallback
+            pil_img = Image.open(image_path)
+            img = np.array(pil_img)
+            if len(img.shape) == 2:
+                img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+            elif img.shape[2] == 4:
+                img = cv2.cvtColor(img, cv2.COLOR_RGBA2BGR)
+
+        # Step 1: Upscale if image is small
+        h, w = img.shape[:2]
+        if h < 500 or w < 500:
+            scale = max(2, 1000 // min(h, w))
+            img = cv2.resize(img, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+
+        # Step 2: Grayscale
         gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        # Apply threshold to make text clearer
-        _, thresh = cv2.threshold(gray, 150, 255, cv2.THRESH_BINARY)
-        # Save preprocessed temp
-        temp_path = image_path.replace('.', '_processed.')
-        cv2.imwrite(temp_path, thresh)
+
+        # Step 3: Denoise
+        denoised = cv2.fastNlMeansDenoising(gray, h=30)
+
+        # Step 4: Adaptive threshold (handles varying lighting)
+        thresh = cv2.adaptiveThreshold(
+            denoised, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, 15, 8
+        )
+
+        # Step 5: OCR with both preprocessed and original
+        results = {}
         
-        # OCR with Chinese + English
-        text = pytesseract.image_to_string(Image.open(temp_path), lang='chi_sim+eng')
-        os.remove(temp_path)
-        return text.strip()
+        # Try preprocessed
+        text1 = pytesseract.image_to_string(thresh, lang='chi_sim+eng', config='--psm 6')
+        results['preprocessed'] = text1.strip()
+
+        # Try original with different PSM
+        text2 = pytesseract.image_to_string(gray, lang='chi_sim+eng', config='--psm 4')
+        results['original'] = text2.strip()
+
+        # Take the longer result
+        best = max(results.values(), key=len) if any(results.values()) else ""
+
+        # Clean up: remove garbage characters, normalize spacing
+        best = re.sub(r'[^\u4e00-\u9fff\u3000-\u303f\uff00-\uffefa-zA-Z0-9\s\.\,\:\;\-\+\#\(\)\[\]\/]', '', best)
+        best = re.sub(r'\n{3,}', '\n\n', best)
+        best = best.strip()
+
+        return best if len(best) > 20 else f"OCR识别内容过少({len(best)}字)，请检查图片清晰度:\n{best}"
+
     except Exception as e:
-        # Fallback to direct PIL
-        try:
-            text = pytesseract.image_to_string(Image.open(image_path), lang='chi_sim+eng')
-            return text.strip()
-        except Exception as e2:
-            return f"OCR识别失败: {e2}"
+        return f"OCR处理失败: {str(e)}"
 
 
-# ===== JSON Extraction Helper =====
+# ===== JSON Extractor =====
 def extract_json(text: str) -> Optional[dict]:
-    """从 AI 回复中提取 JSON"""
-    # Try direct parse
     try:
         return json.loads(text)
     except:
         pass
-    
-    # Try ```json ... ```
-    import re
-    for pattern in [r'```json\s*(.*?)\s*```', r'```\s*(.*?)\s*```', r'(\{.*\})']:
+    for pattern in [r'```json\s*(.*?)\s*```', r'```\s*(.*?)\s*```', r'(\{[\s\S]*\})']:
         match = re.search(pattern, text, re.DOTALL)
         if match:
             try:
@@ -87,128 +103,140 @@ def extract_json(text: str) -> Optional[dict]:
     return None
 
 
+# ===== Robust ARK Call =====
+def ark_call(messages, temperature=0.3, max_tokens=4096, retries=2):
+    """ARK API 调用带重试"""
+    last_error = None
+    for attempt in range(retries + 1):
+        try:
+            result = client.chat(messages, temperature=temperature, max_tokens=max_tokens)
+            if result["success"]:
+                return result
+            last_error = result.get("error", "Unknown error")
+        except Exception as e:
+            last_error = str(e)
+        
+        if attempt < retries:
+            time.sleep(1 * (attempt + 1))  # Exponential backoff
+    
+    return {"success": False, "error": f"重试{retries}次后仍失败: {last_error}"}
+
+
+# ===== System Prompts =====
+JD_PROMPT = """你是一个专业的JD分析专家。分析招聘JD，返回严格JSON格式:
+{
+  "daily_work": ["每天和业务沟通需求，了解系统要实现的功能", "根据需求进行前端架构设计", "使用React/Vue进行核心代码开发", "与后端联调接口，确保前后端对接顺畅", "参与代码评审和技术方案讨论"],
+  "hard_skills": [{"name": "技能名", "level": "精通/熟练/了解"}],
+  "soft_skills": ["沟通能力", "团队协作"],
+  "hidden_requirements": ["能接受加班", "抗压能力"],
+  "salary_info": {"base": "范围", "year_end": "范围", "total_annual": "范围"},
+  "interview_focus": ["面试重点1", "重点2"],
+  "career_path": "职业发展方向",
+  "match_advice": "匹配建议"
+}
+如果JD文字不全或有不规范字符，尽最大努力分析可识别的信息。只返回JSON。"""
+
+SKILL_PROMPT = """你是职业能力分析师。分析用户技能与目标岗位，返回JSON:
+{
+  "match_score": 65,
+  "match_analysis": "简短分析",
+  "user_skills": [{"name": "技能", "level": 7, "evidence": "来源"}],
+  "transferable_skills": [
+    {"skill": "可迁移能力名", "from": "来源经历", "to": "可应用到目标岗位", "impact": "高/中"}
+  ],
+  "gaps": [{"skill": "差距技能", "gap": 5, "priority": "高/中/低", "reason": "原因", "fix": "解决方法"}],
+  "recommendations": ["建议1"],
+  "roadmap": {"month_1": ["计划1"], "month_3": ["计划2"], "month_6": ["计划3"]}
+}
+强调从非技术/非相关经历中发现可迁移到目标岗位的能力。只返回JSON。"""
+
+
 # ===== Routes =====
 @app.get("/")
 async def root():
-    return {"service": "CareerPath AI", "version": "3.0.1", "status": "running"}
+    return {"service": "CareerPath AI", "version": "3.0.2", "status": "running"}
 
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
 
 
-# ----- Image JD Upload -----
 @app.post("/api/jd-from-image")
 async def jd_from_image(file: UploadFile = File(...)):
-    """上传图片 → OCR识别 → JD翻译"""
     if not file.filename.lower().endswith(('.png', '.jpg', '.jpeg', '.webp', '.bmp')):
-        raise HTTPException(400, "仅支持图片格式: PNG, JPG, JPEG, WebP, BMP")
+        raise HTTPException(400, "仅支持图片格式")
     
-    # Save uploaded file
     file_path = UPLOAD_DIR / file.filename
     with open(file_path, "wb") as f:
-        content = await file.read()
-        f.write(content)
+        f.write(await file.read())
     
-    # OCR
-    ocr_text = ocr_image(str(file_path))
+    ocr_text = ocr_image_enhanced(str(file_path))
     os.remove(file_path)
     
-    if not ocr_text or len(ocr_text) < 10:
-        return {"success": False, "error": "图片中未识别到足够的文字，请尝试更清晰的图片", "ocr_text": ocr_text}
+    if len(ocr_text) < 15:
+        return {"success": False, "error": f"图片文字识别不足 ({len(ocr_text)}字)，建议直接粘贴文字", "ocr_text": ocr_text}
     
-    # Translate
-    result = client.translate_jd(ocr_text)
+    # Send OCR text to JD analysis with special handling for imperfect text
+    result = ark_call([
+        {"role": "system", "content": f"{JD_PROMPT}\n注意：以下文字可能包含OCR识别误差，请根据上下文推断正确内容。"},
+        {"role": "user", "content": ocr_text}
+    ], temperature=0.2, max_tokens=4096, retries=1)
+    
     if not result["success"]:
-        return {"success": False, "error": result["error"], "ocr_text": ocr_text}
+        return {"success": True, "ocr_text": ocr_text, "data": None, "error": result["error"]}
     
+    parsed = extract_json(result["data"])
     return {
         "success": True,
         "ocr_text": ocr_text,
-        "data": result["data"],
+        "data": parsed or result["data"],
         "model_used": result["model_used"],
         "tokens": result["tokens"]
     }
 
 
-# ----- JD Translate (Structured) -----
-JD_SYSTEM_PROMPT = """你是一个JD分析专家。分析招聘JD，返回严格的JSON格式:
-{
-  "daily_work": ["工作内容1", "工作内容2", "工作内容3"],
-  "hard_skills": [{"name": "React", "level": "精通", "importance": 9}],
-  "soft_skills": ["沟通能力", "团队协作"],
-  "hidden_requirements": ["能接受加班", "有抗压能力"],
-  "salary_info": {"base": "20k-35k", "year_end": "2-4个月", "total_annual": "28w-50w"},
-  "company_info": {"industry": "互联网", "stage": "D轮及以上"},
-  "career_path": "前端架构师/技术负责人方向发展",
-  "interview_focus": ["框架原理", "项目经验", "系统设计"],
-  "match_advice": "建议补充Node.js后端经验"
-}
-只返回JSON，不要其他文字。"""
-
 @app.post("/api/jd-translate")
 async def jd_translate(data: JDInput):
-    """JD翻译官 (结构化JSON)"""
-    result = client.chat([
-        {"role": "system", "content": JD_SYSTEM_PROMPT},
+    if not data.jd_text.strip():
+        return {"success": False, "error": "JD内容为空"}
+    
+    result = ark_call([
+        {"role": "system", "content": JD_PROMPT},
         {"role": "user", "content": data.jd_text}
-    ], temperature=0.2)
+    ], temperature=0.2, max_tokens=4096, retries=2)
     
     if not result["success"]:
         return {"success": False, "error": result["error"]}
     
     parsed = extract_json(result["data"])
-    if parsed:
-        return {"success": True, "data": parsed, "raw": result["data"], "model_used": result["model_used"], "tokens": result["tokens"]}
-    
-    return {"success": True, "data": result["data"], "raw_mode": True, "model_used": result["model_used"], "tokens": result["tokens"]}
+    return {
+        "success": True,
+        "data": parsed or result["data"],
+        "model_used": result["model_used"],
+        "tokens": result["tokens"]
+    }
 
-
-# ----- Skill Radar (Enhanced) -----
-SKILL_SYSTEM_PROMPT = """你是顶尖的职业能力分析师。分析用户技能与目标岗位的差距，返回JSON:
-{
-  "match_score": 65,
-  "match_analysis": "你的技术基础不错，但缺少...",
-  "user_skills": [
-    {"name": "React", "level": 7, "category": "技术", "evidence": "2年项目经验"},
-    {"name": "Python", "level": 5, "category": "技术", "evidence": "课程项目"}
-  ],
-  "required_skills": [
-    {"name": "React", "importance": 9, "category": "技术"},
-    {"name": "TypeScript", "importance": 8, "category": "技术"}
-  ],
-  "gaps": [
-    {"skill": "TypeScript", "gap": 8, "priority": "高", "reason": "岗位核心要求", "fix": "花2周学习TypeScript"},
-    {"skill": "系统设计", "gap": 5, "priority": "中", "reason": "高级岗位需要"}
-  ],
-  "transferable_skills": [
-    {"skill": "数据分析思维", "from": "曾用Excel做校园活动数据统计", "to": "产品岗位的数据驱动决策能力", "impact": "高"},
-    {"skill": "项目管理", "from": "组织过50人社团活动", "to": "跨部门协作的项目管理能力"}
-  ],
-  "recommendations": ["建议1", "建议2"],
-  "roadmap": {
-    "month_1": ["学习TypeScript基础", "完成1个小型React+TS项目"],
-    "month_3": ["深入学习Node.js", "做1个全栈项目"],
-    "month_6": ["学习系统设计", "准备面试题库"]
-  }
-}
-只返回JSON。强调可迁移能力发现：从非技术经历中发现可迁移到目标岗位的能力。"""
 
 @app.post("/api/skill-radar")
 async def skill_radar(data: SkillInput):
-    result = client.chat([
-        {"role": "system", "content": SKILL_SYSTEM_PROMPT},
-        {"role": "user", "content": f"我的技能/经历: {data.skills}\n目标岗位: {data.target_job}"}
-    ], temperature=0.3, model="ep-20260430160624-7wlsh")
+    if not data.skills.strip() or not data.target_job.strip():
+        return {"success": False, "error": "技能或目标岗位为空"}
+    
+    result = ark_call([
+        {"role": "system", "content": SKILL_PROMPT},
+        {"role": "user", "content": f"我的技能/经历:\n{data.skills}\n\n目标岗位: {data.target_job}"}
+    ], temperature=0.3, max_tokens=4096, retries=2)
     
     if not result["success"]:
         return {"success": False, "error": result["error"]}
     
     parsed = extract_json(result["data"])
-    if parsed:
-        return {"success": True, "data": parsed, "raw": result["data"], "model_used": result["model_used"], "tokens": result["tokens"]}
-    
-    return {"success": True, "data": result["data"], "raw_mode": True, "model_used": result["model_used"], "tokens": result["tokens"]}
+    return {
+        "success": True,
+        "data": parsed or result["data"],
+        "model_used": result["model_used"],
+        "tokens": result["tokens"]
+    }
 
 
 if __name__ == "__main__":

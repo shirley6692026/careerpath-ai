@@ -1,7 +1,5 @@
 import { useState, useCallback } from 'react';
-import { jdTranslate } from './services/api';
-
-const API_BASE = 'http://localhost:8000';
+import { jdTranslate, jdFromImage } from './services/api';
 
 const SAMPLES = [
   `【高级前端开发工程师】
@@ -37,35 +35,46 @@ export default function JDTranslator() {
   const [dragOver, setDragOver] = useState(false);
 
   const handleTranslate = async () => {
-    if (!jdText.trim()) return;
-    setLoading(true); setError(''); setResult(null); setShowOcr(false);
+    const textToAnalyze = showOcr ? ocrText : jdText;
+    if (!textToAnalyze.trim()) return;
+    setLoading(true); setError(''); setResult(null);
     try {
-      const res = await jdTranslate(jdText);
-      if (res.success) setResult(res);
-      else setError(res.error || '分析失败');
-    } catch (e) { setError('网络错误，请检查后端'); }
+      const res = await jdTranslate(textToAnalyze);
+      if (res.success) {
+        setResult(res);
+      } else {
+        setError(res.error || '分析失败，请重试');
+      }
+    } catch (e) {
+      setError('网络连接失败，请确认后端服务在运行');
+    }
     setLoading(false);
   };
 
   const handleImageUpload = useCallback(async (file) => {
     if (!file) return;
     setLoading(true); setError(''); setResult(null);
-    const formData = new FormData();
-    formData.append('file', file);
     try {
-      const res = await fetch(`${API_BASE}/api/jd-from-image`, {
-        method: 'POST', body: formData
-      });
-      const data = await res.json();
+      const data = await jdFromImage(file);
       if (data.success) {
-        setResult(data);
+        // Set OCR text for editing
         setOcrText(data.ocr_text || '');
         setJdText(data.ocr_text || '');
-        if (data.ocr_text) setShowOcr(true);
+        setShowOcr(true);
+        // If OCR text is too short, warn
+        if ((data.ocr_text || '').length < 30) {
+          setError('⚠️ OCR识别文字较少，建议检查图片清晰度后重试，或直接手工输入JD文字');
+        }
+        // If we already have analysis result alongside OCR text, show it
+        if (data.data) {
+          setResult({ success: true, data: data.data, raw: data.raw, model_used: data.model_used });
+        }
       } else {
-        setError(data.error || '识别失败');
+        setError(data.error || '图片识别失败，建议直接粘贴文字JD');
       }
-    } catch (e) { setError('上传失败'); }
+    } catch (e) {
+      setError('上传失败，请确认后端服务在运行');
+    }
     setLoading(false);
   }, []);
 
@@ -76,44 +85,44 @@ export default function JDTranslator() {
   }, [handleImageUpload]);
 
   const d = result?.data;
-  const isJson = d && typeof d === 'object' && !Array.isArray(d);
+  const isJson = d && typeof d === 'object' && !Array.isArray(d) && d.daily_work;
 
   return (
     <div>
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-slate-800">📄 JD 翻译官</h2>
-        <p className="text-slate-500 mt-1">粘贴文字JD 或 上传图片 → 看懂企业的真实需求</p>
+        <p className="text-slate-500 mt-1">粘贴文字 或 上传截图 → AI分析企业真实需求</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Input Panel */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
-          {/* 图片上传 */}
+          {/* Image Upload Zone */}
           <div
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
             onDragLeave={() => setDragOver(false)}
             onDrop={handleDrop}
             onClick={() => document.getElementById('imgInput')?.click()}
-            className={`border-2 border-dashed rounded-xl p-6 text-center cursor-pointer transition-all mb-4 ${
-              dragOver ? 'border-blue-500 bg-blue-50' : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+            className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all mb-4 ${
+              dragOver ? 'border-blue-500 bg-blue-50 scale-[1.02]' : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
             }`}
           >
             <input id="imgInput" type="file" accept="image/*" className="hidden"
               onChange={(e) => e.target.files[0] && handleImageUpload(e.target.files[0])} />
-            <div className="text-3xl mb-2">📸</div>
-            <p className="text-sm text-slate-500">拖拽图片到此处 或 点击上传</p>
-            <p className="text-xs text-slate-400 mt-1">支持：脉脉/朋友圈分享的JD截图</p>
+            <div className="text-3xl mb-1">📸</div>
+            <p className="text-sm text-slate-500 font-medium">上传脉脉/JD截图</p>
+            <p className="text-xs text-slate-400 mt-0.5">支持 PNG / JPG / WebP — 拖拽或点击上传</p>
           </div>
 
           <div className="flex items-center gap-3 mb-3">
             <div className="flex-1 h-px bg-slate-200"></div>
-            <span className="text-xs text-slate-400">或直接粘贴文字</span>
+            <span className="text-xs text-slate-400">或直接粘贴 JD 文字</span>
             <div className="flex-1 h-px bg-slate-200"></div>
           </div>
 
           <div className="flex gap-2 mb-3 flex-wrap">
             {SAMPLES.map((s, i) => (
-              <button key={i} onClick={() => { setJdText(s); setShowOcr(false); }}
+              <button key={i} onClick={() => { setJdText(s); setShowOcr(false); setError(''); }}
                 className="text-xs px-3 py-1.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-all">
                 示例 {i + 1}
               </button>
@@ -121,23 +130,41 @@ export default function JDTranslator() {
           </div>
 
           <textarea
-            value={jdText}
-            onChange={(e) => { setJdText(e.target.value); setShowOcr(false); }}
-            placeholder="粘贴招聘 JD 文本，或上传图片自动填充..."
-            className="w-full h-48 p-4 border border-slate-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm transition-all"
+            value={showOcr ? ocrText : jdText}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (showOcr) setOcrText(val);
+              setJdText(val);
+            }}
+            placeholder="粘贴招聘 JD 文本..."
+            className={`w-full h-44 p-4 border rounded-lg resize-none focus:outline-none transition-all text-sm ${
+              showOcr ? 'border-green-300 bg-green-50 focus:ring-2 focus:ring-green-500' : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
+            }`}
           />
 
           {showOcr && (
-            <div className="mt-2 p-2 bg-green-50 text-green-700 rounded-lg text-xs flex items-center gap-2">
-              ✅ OCR已提取 {ocrText.length} 字
-              <button onClick={() => setShowOcr(false)} className="text-green-500 hover:text-green-700">隐藏</button>
+            <div className="mt-2 p-2.5 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs text-green-700 font-medium">✅ OCR已识别 ({ocrText.length}字)</span>
+                <div className="flex gap-2">
+                  <button onClick={() => { setShowOcr(false); setJdText(ocrText); }}
+                    className="text-xs px-2 py-1 bg-blue-100 text-blue-600 rounded hover:bg-blue-200">
+                    使用识别文字
+                  </button>
+                  <button onClick={() => { setShowOcr(false); setJdText(''); setOcrText(''); }}
+                    className="text-xs px-2 py-1 bg-slate-100 text-slate-500 rounded hover:bg-slate-200">
+                    清除
+                  </button>
+                </div>
+              </div>
+              <p className="text-[11px] text-green-600">💡 建议检查识别结果，修正错别字后再分析</p>
             </div>
           )}
 
           <button
             onClick={handleTranslate}
-            disabled={loading || !jdText.trim()}
-            className={`w-full mt-4 py-3 rounded-xl font-semibold text-white transition-all transform active:scale-[0.98] ${
+            disabled={loading || !((showOcr ? ocrText : jdText) || '').trim()}
+            className={`w-full mt-4 py-3 rounded-xl font-semibold text-white transition-all transform active:scale-[0.97] ${
               loading ? 'bg-blue-400 cursor-wait' : 'bg-blue-600 hover:bg-blue-700 shadow-md hover:shadow-lg'
             }`}
           >
@@ -149,12 +176,12 @@ export default function JDTranslator() {
                 </svg>
                 <span className="animate-pulse">豆包正在深度分析...</span>
               </span>
-            ) : '🔍 AI 分析 JD'}
+            ) : showOcr ? '🔍 分析图片中的 JD' : '🔍 AI 分析 JD'}
           </button>
 
           {error && (
-            <div className="mt-3 p-3 bg-red-50 text-red-600 rounded-lg text-sm animate-fadeIn">
-              ❌ {error}
+            <div className="mt-3 p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm animate-fadeIn">
+              {error}
             </div>
           )}
         </div>
@@ -165,16 +192,16 @@ export default function JDTranslator() {
           
           {!result && !loading && (
             <div className="text-center py-16 text-slate-300">
-              <div className="text-5xl mb-4 animate-bounce">🔍</div>
+              <div className="text-5xl mb-4">🔍</div>
               <p>粘贴 JD 或上传截图开始分析</p>
-              <p className="text-sm mt-2 text-slate-400">基于 Doubao-1.5-pro · 火山引擎 ARK</p>
+              <p className="text-sm mt-2 text-slate-400">Doubao-1.5-pro · 火山引擎 ARK</p>
             </div>
           )}
 
           {loading && (
             <div className="text-center py-16 text-slate-400">
               <div className="animate-spin text-5xl mb-4">⏳</div>
-              <p>AI 正在解析 JD...</p>
+              <p>AI 正在解析...</p>
               <p className="text-sm mt-2 text-slate-400">分析能力要求 · 拆解薪资 · 识别隐藏需求</p>
               <div className="mt-4 w-32 h-1.5 bg-slate-200 rounded-full mx-auto overflow-hidden">
                 <div className="h-full bg-blue-500 rounded-full animate-pulse" style={{width: '60%'}}></div>
@@ -182,116 +209,101 @@ export default function JDTranslator() {
             </div>
           )}
 
-          {/* Structured JSON Output */}
           {isJson && (
             <div className="space-y-3 overflow-y-auto max-h-[520px] pr-1 custom-scrollbar">
-              <AnimatedSection>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-lg">🏢</span>
-                  <h4 className="font-semibold text-sm text-slate-700">真实工作日常</h4>
-                </div>
+              {/* Daily Work */}
+              <Section icon="🏢" title="真实工作日常">
                 <ul className="space-y-1.5">
                   {(d.daily_work || []).map((item, i) => (
                     <li key={i} className="flex gap-2 text-sm text-slate-700">
                       <span className="text-blue-500 mt-0.5 shrink-0">▸</span>
-                      {typeof item === 'object' ? (item.content || item.name || JSON.stringify(item)) : item}
+                      {typeof item === 'object' ? (item.content || item.name || '') : item}
                     </li>
                   ))}
                 </ul>
-              </AnimatedSection>
+              </Section>
 
-              <AnimatedSection delay="100ms">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-100">
-                    <h4 className="font-semibold text-xs text-blue-700 mb-1.5">🔧 硬技能</h4>
-                    <div className="flex flex-wrap gap-1">
-                      {(d.hard_skills || []).map((s, i) => (
-                        <span key={i} className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full text-xs">
-                          {typeof s === 'object' ? (s.name || JSON.stringify(s)) : s}
-                        </span>
-                      ))}
-                    </div>
+              {/* Skills Grid */}
+              <div className="grid grid-cols-2 gap-2">
+                <Section icon="🔧" title="硬技能" color="blue" compact>
+                  <div className="flex flex-wrap gap-1">
+                    {(d.hard_skills || []).map((s, i) => (
+                      <span key={i} className={`px-2 py-0.5 rounded-full text-xs ${
+                        typeof s === 'object' && s.level === '精通' ? 'bg-blue-200 text-blue-800' : 'bg-blue-100 text-blue-700'
+                      }`}>
+                        {typeof s === 'object' ? s.name : s}
+                      </span>
+                    ))}
                   </div>
-                  <div className="bg-purple-50 p-3 rounded-lg border border-purple-100">
-                    <h4 className="font-semibold text-xs text-purple-700 mb-1.5">💬 软技能</h4>
-                    <div className="flex flex-wrap gap-1">
-                      {(d.soft_skills || []).map((s, i) => (
-                        <span key={i} className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs">
-                          {typeof s === 'object' ? (s.name || JSON.stringify(s)) : s}
-                        </span>
-                      ))}
-                    </div>
+                </Section>
+                <Section icon="💬" title="软技能" color="purple" compact>
+                  <div className="flex flex-wrap gap-1">
+                    {(d.soft_skills || []).map((s, i) => (
+                      <span key={i} className="px-2 py-0.5 bg-purple-100 text-purple-700 rounded-full text-xs">
+                        {typeof s === 'object' ? s.name : s}
+                      </span>
+                    ))}
                   </div>
-                </div>
-              </AnimatedSection>
+                </Section>
+              </div>
 
-              {d.hidden_requirements && d.hidden_requirements.length > 0 && (
-                <AnimatedSection delay="200ms">
-                  <div className="bg-orange-50 p-3 rounded-lg border border-orange-200">
-                    <h4 className="font-semibold text-xs text-orange-700 mb-1.5">🔍 隐藏要求</h4>
-                    <div className="flex flex-wrap gap-1">
-                      {d.hidden_requirements.map((hr, i) => (
-                        <span key={i} className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs">
-                          {typeof hr === 'object' ? (hr.name || JSON.stringify(hr)) : hr}
-                        </span>
-                      ))}
-                    </div>
+              {/* Hidden Requirements */}
+              {d.hidden_requirements?.length > 0 && (
+                <Section icon="🔍" title="隐藏要求" color="orange">
+                  <div className="flex flex-wrap gap-1">
+                    {(d.hidden_requirements || []).map((hr, i) => (
+                      <span key={i} className="px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full text-xs">
+                        {typeof hr === 'object' ? hr.name : hr}
+                      </span>
+                    ))}
                   </div>
-                </AnimatedSection>
+                </Section>
               )}
 
+              {/* Salary */}
               {d.salary_info && (
-                <AnimatedSection delay="300ms">
-                  <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                    <h4 className="font-semibold text-xs text-green-700 mb-1.5">💰 薪资拆解</h4>
-                    <div className="grid grid-cols-3 gap-2 text-xs">
-                      {d.salary_info.base && <div><span className="text-slate-500">Base</span><br/><span className="font-semibold text-green-700">{d.salary_info.base}</span></div>}
-                      {d.salary_info.year_end && <div><span className="text-slate-500">年终</span><br/><span className="font-semibold text-green-700">{d.salary_info.year_end}</span></div>}
-                      {d.salary_info.total_annual && <div><span className="text-slate-500">年薪</span><br/><span className="font-semibold text-green-700">{d.salary_info.total_annual}</span></div>}
-                    </div>
+                <Section icon="💰" title="薪资拆解" color="green">
+                  <div className="grid grid-cols-3 gap-2 text-sm">
+                    {d.salary_info.base && <div><span className="text-xs text-slate-500">Base</span><br/><span className="font-semibold text-green-700">{d.salary_info.base}</span></div>}
+                    {d.salary_info.year_end && <div><span className="text-xs text-slate-500">年终</span><br/><span className="font-semibold text-green-700">{d.salary_info.year_end}</span></div>}
+                    {d.salary_info.total_annual && <div><span className="text-xs text-slate-500">年薪</span><br/><span className="font-semibold">{d.salary_info.total_annual}</span></div>}
                   </div>
-                </AnimatedSection>
+                </Section>
               )}
 
-              {d.interview_focus && d.interview_focus.length > 0 && (
-                <AnimatedSection delay="400ms">
-                  <div className="bg-red-50 p-3 rounded-lg border border-red-200">
-                    <h4 className="font-semibold text-xs text-red-700 mb-1.5">🎯 面试重点</h4>
-                    <div className="flex flex-wrap gap-1">
-                      {(d.interview_focus || []).map((f, i) => (
-                        <span key={i} className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs">
-                          {typeof f === 'object' ? (f.name || JSON.stringify(f)) : f}
-                        </span>
-                      ))}
-                    </div>
+              {/* Interview Focus */}
+              {d.interview_focus?.length > 0 && (
+                <Section icon="🎯" title="面试重点" color="red">
+                  <div className="flex flex-wrap gap-1">
+                    {(d.interview_focus || []).map((f, i) => (
+                      <span key={i} className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs">
+                        {typeof f === 'object' ? f.name : f}
+                      </span>
+                    ))}
                   </div>
-                </AnimatedSection>
+                </Section>
               )}
 
-              {d.career_path && (
-                <AnimatedSection delay="500ms">
-                  <div className="bg-indigo-50 p-3 rounded-lg border border-indigo-200">
-                    <h4 className="font-semibold text-xs text-indigo-700 mb-1">🛤️ 职业发展路径</h4>
+              {/* Career Path + Advice */}
+              <div className="grid grid-cols-2 gap-2">
+                {d.career_path && (
+                  <Section icon="🛤️" title="职业路径" color="indigo" compact>
                     <p className="text-sm text-slate-700">{d.career_path}</p>
-                  </div>
-                </AnimatedSection>
-              )}
-
-              {d.match_advice && (
-                <AnimatedSection delay="600ms">
-                  <div className="bg-blue-50 p-3 rounded-lg border border-blue-200">
-                    <h4 className="font-semibold text-xs text-blue-700 mb-1">💡 匹配建议</h4>
+                  </Section>
+                )}
+                {d.match_advice && (
+                  <Section icon="💡" title="匹配建议" color="blue" compact>
                     <p className="text-sm text-slate-700">{d.match_advice}</p>
-                  </div>
-                </AnimatedSection>
-              )}
+                  </Section>
+                )}
+              </div>
             </div>
           )}
 
-          {/* Raw text output fallback */}
-          {result && !isJson && (
-            <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">
-              {typeof result.data === 'string' ? result.data : JSON.stringify(result.data, null, 2)}
+          {/* Fallback for text output */}
+          {result && !isJson && typeof result.data === 'string' && (
+            <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed animate-fadeIn">
+              {result.data}
             </div>
           )}
         </div>
@@ -300,12 +312,18 @@ export default function JDTranslator() {
   );
 }
 
-function AnimatedSection({ children, delay = '0ms' }) {
+function Section({ icon, title, color = 'blue', compact, children }) {
+  const colors = {
+    blue: 'border-blue-200 bg-blue-50',
+    green: 'border-green-200 bg-green-50',
+    purple: 'border-purple-200 bg-purple-50',
+    orange: 'border-orange-200 bg-orange-50',
+    red: 'border-red-200 bg-red-50',
+    indigo: 'border-indigo-200 bg-indigo-50',
+  };
   return (
-    <div
-      className="animate-fadeIn"
-      style={{ animationDelay: delay }}
-    >
+    <div className={`rounded-lg border ${colors[color] || colors.blue} ${compact ? 'p-3' : 'p-4'} animate-fadeIn`}>
+      <h4 className="font-semibold text-xs mb-1.5 text-slate-600">{icon} {title}</h4>
       {children}
     </div>
   );

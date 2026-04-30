@@ -10,9 +10,20 @@ export async function callApi(endpoint, data) {
 }
 
 export async function jdTranslate(jdText) {
-  return callApi('/api/jd-translate-structured', { jd_text: jdText });
+  // The main /api/jd-translate now returns structured JSON
+  return callApi('/api/jd-translate', { jd_text: jdText });
 }
 
 export async function skillRadar(skills, targetJob) {
-  return callApi('/api/skill-radar-structured', { skills, target_job: targetJob });
+  return callApi('/api/skill-radar', { skills, target_job: targetJob });
+}
+
+export async function jdFromImage(file) {
+  const formData = new FormData();
+  formData.append('file', file);
+  const res = await fetch(`${API_BASE}/api/jd-from-image`, {
+    method: 'POST',
+    body: formData
+  });
+  return res.json();
 }
