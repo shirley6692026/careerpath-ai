@@ -59,6 +59,7 @@ export default function Interview() {
   const [prepData, setPrepData] = useState(null);
   const [showPrep, setShowPrep] = useState(false);
   const [prepLoading, setPrepLoading] = useState(false);
+  const [allDone, setAllDone] = useState(false);
   const recognitionRef = useRef(null);
   const timerRef = useRef(null);
 
@@ -186,6 +187,7 @@ export default function Interview() {
   const startInterview = async () => {
     if (!position.trim()) return;
     setLoading(true); setError('');
+    setShowSummary(false); setShowPrep(false); setAllDone(false);
     try {
       const res = await fetch(`${API_BASE}/api/interview/generate`, {
         method: 'POST',
@@ -251,10 +253,14 @@ export default function Interview() {
       const next = questions[currentQ + 1];
       startTimer(next?.time_limit || MODE_DETAILS[mode].time);
     } else {
-      // All questions answered - show summary
-      setShowSummary(true);
-      setTimeout(() => generateSummary(), 100);
+      // All questions done - show "完成面试" button instead of auto-summary
+      setAllDone(true);
     }
+  };
+
+  const finishInterview = () => {
+    setShowSummary(true);
+    setTimeout(() => generateSummary(), 100);
   };
 
   const q = questions[currentQ];
@@ -374,7 +380,7 @@ export default function Interview() {
             </div>
 
             <div className="flex gap-3 justify-center">
-              <button onClick={() => { setShowSummary(false); setStep('setup'); }}
+              <button onClick={() => { setShowSummary(false); setShowPrep(false); setStep('setup'); }}
                 className="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold shadow-md hover:bg-blue-700 transition-all">
                 🔄 再来一次
               </button>
@@ -488,8 +494,8 @@ export default function Interview() {
 
             <div className="flex gap-3 justify-center">
               <button onClick={() => { setShowPrep(false); }}
-                className="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold shadow-md hover:bg-blue-700">⬅️ 返回结果</button>
-              <button onClick={() => { setShowPrep(false); setShowSummary(false); setStep('setup'); }}
+                className="px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold shadow-md hover:bg-blue-700">⬅️ 返回上一页</button>
+              <button onClick={() => { setShowPrep(false); setShowSummary(false); setStep('setup'); setAllDone(false); setQuestions([]); setHistory([]); }}
                 className="px-6 py-3 bg-green-600 text-white rounded-xl font-semibold shadow-md hover:bg-green-700">🔄 开始新面试</button>
             </div>
           </div>
@@ -667,9 +673,26 @@ export default function Interview() {
                 {loading ? '⏳ AI深度评估...' : '📊 提交评估'}
               </button>
             ) : (
-              <button onClick={nextQuestion}
-                className="flex-1 py-3 rounded-xl font-semibold bg-green-600 text-white hover:bg-green-700 shadow-md transition-all">
-                {currentQ + 1 < questions.length ? '➡️ 下一题' : '✅ 完成面试'}
+              <div className="flex gap-2">
+                <button onClick={nextQuestion}
+                  className={`flex-1 py-3 rounded-xl font-semibold text-white shadow-md transition-all ${
+                    allDone ? 'bg-green-600 hover:bg-green-700' : 'bg-green-600 hover:bg-green-700'
+                  }`}>
+                  {!allDone ? '➡️ 下一题' : '✅ 查看所有反馈'}
+                </button>
+                {allDone && (
+                  <button onClick={finishInterview}
+                    className="flex-1 py-3 rounded-xl font-semibold bg-blue-600 text-white shadow-md hover:bg-blue-700 transition-all">
+                    📊 查看总结报告
+                  </button>
+                )}
+              </div>
+            )}
+            {/* Show summary button when all done and feedback visible */}
+            {allDone && feedback && (
+              <button onClick={finishInterview}
+                className="w-full mt-2 py-2.5 rounded-xl font-semibold bg-indigo-600 text-white shadow-md hover:bg-indigo-700 transition-all text-sm">
+                📊 查看面试总结报告
               </button>
             )}
           </div>
