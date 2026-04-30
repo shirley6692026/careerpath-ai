@@ -58,10 +58,20 @@ export default function Interview() {
 
   // Voice input
   const startVoiceInput = () => {
+    // Check browser support
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
       setError('⚠️ 当前浏览器不支持语音输入，请使用 Chrome 或 Edge');
       return;
     }
+    // Request microphone permission explicitly
+    navigator.mediaDevices.getUserMedia({ audio: true })
+      .then(function(stream) {
+        stream.getTracks().forEach(track => track.stop());
+      })
+      .catch(function(err) {
+        setError('⚠️ 麦克风权限被拒绝。请在浏览器地址栏左侧点击🔒 → 网站设置 → 允许麦克风，然后刷新页面重试。');
+        return;
+      });
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.lang = 'zh-CN';
@@ -78,7 +88,11 @@ export default function Interview() {
     
     recognition.onerror = (event) => {
       setIsRecording(false);
-      setError('语音识别出错: ' + event.error);
+      if (event.error === 'not-allowed') {
+        setError('🎤 麦克风被拒绝！请在浏览器地址栏左侧点击🔒 → 网站设置 → 允许麦克风，然后刷新页面。');
+      } else {
+        setError('🎤 语音识别出错: ' + event.error + '。请检查麦克风连接，或改用文字输入。');
+      }
     };
     
     recognition.onend = () => setIsRecording(false);

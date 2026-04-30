@@ -212,7 +212,7 @@ async def interview_generate(data: InterviewRequest):
     
     resume_context = ""
     if data.resume_text and len(data.resume_text) > 10:
-        resume_context = f"\n\n候选人简历信息:\n{data.resume_text[:2000]}\n\n⚠️ 所有面试题必须严格基于以上简历内容出题。"
+        resume_context = f"\n\n候选人简历信息:\n{data.resume_text[:2000]}\n\n⚠️ 所有面试题应基于以上简历内容出题(如未提供简历则基于岗位通用标准)。"
     
     # Framework selection by mode
     frameworks = {
@@ -261,7 +261,7 @@ async def interview_generate(data: InterviewRequest):
     
     r = ark_call([
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"请为{data.position}({data.domain or '不限行业'})岗位生成{data.mode}模式面试题。必须基于简历中提到的具体项目、技能和经历出题。"}
+        {"role": "user", "content": f"请为{data.position}({data.domain or '不限行业'})岗位生成{data.mode}模式面试题。如果有简历则基于简历内容出题；如果没有简历，则基于岗位和行业的通用专业要求出题。"}
     ], temp=0.4, max_tokens=4096)
     
     if not r["success"]: return {"success": False, "error": r["error"]}
