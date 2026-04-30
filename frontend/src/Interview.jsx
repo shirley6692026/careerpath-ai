@@ -696,7 +696,7 @@ export default function Interview() {
             </div>
           )}
 
-          {feedback && typeof feedback === 'object' && (
+          {feedback && typeof feedback === 'object' && !feedback._isPlainText && (
             <div className="space-y-3 overflow-y-auto max-h-[520px] pr-1 custom-scrollbar animate-fadeIn">
               <div className="text-center py-4 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl">
                 <div className="text-5xl font-bold" style={{color: (feedback.score || 5) >= 7 ? '#16a34a' : feedback.score >= 4 ? '#ca8a04' : '#dc2626'}}>
