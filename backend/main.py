@@ -239,5 +239,118 @@ async def skill_radar(data: SkillInput):
     }
 
 
+
+# ===== Interview System Prompts =====
+INTERVIEW_QUESTION_PROMPT = """你是一个专业的面试官。根据目标岗位和公司，生成3-5个面试题。
+返回JSON格式:
+{
+  "company_style": "字节跳动/阿里巴巴风格",
+  "questions": [
+    {
+      "id": 1,
+      "type": "技术/行为/场景/压力",
+      "question": "面试题内容",
+      "difficulty": "简单/中等/困难",
+      "expected_keywords": ["关键词1", "关键词2"],
+      "tips": "回答思路提示",
+      "time_limit": 180
+    }
+  ],
+  "total_duration": "预计时长",
+  "focus_areas": ["重点考察方向1", "方向2"]
+}
+只返回JSON。"""
+
+INTERVIEW_FEEDBACK_PROMPT = """你是专业的面试评分专家。评估面试回答，返回JSON:
+{
+  "score": 7,
+  "overall": "总体评价",
+  "strengths": ["优点1", "优点2"],
+  "weaknesses": ["不足1", "不足2"],
+  "dimensions": {
+    "professional": {"score": 7, "comment": "专业能力评价"},
+    "communication": {"score": 8, "comment": "沟通表达评价"},
+    "logic": {"score": 7, "comment": "逻辑思维评价"},
+    "fit": {"score": 6, "comment": "岗位匹配度"}
+  },
+  "improved_answer": "优化后的参考答案",
+  "next_question_hint": "面试官可能会追问的方向"
+}
+只返回JSON。"""
+
+
+class InterviewRequest(BaseModel):
+    position: str
+    company: str = ""
+    mode: str = "practice"  # practice / real / pressure
+    skills: str = ""
+
+
+class InterviewAnswer(BaseModel):
+    position: str
+    company: str = ""
+    question: str
+    question_type: str = ""
+    answer: str
+
+
+@app.post("/api/interview/generate")
+async def interview_generate(data: InterviewRequest):
+    """生成面试题"""
+    company_context = f"目标公司: {data.company}" if data.company else ""
+    mode_context = {
+        "practice": "练习模式：不需要限时，提供答题思路提示",
+        "real": "实战模式：严格限时，还原真实面试",
+        "pressure": "压力模式：设计压力测试题，面试官会追问质疑"
+    }.get(data.mode, "实战模式")
+    
+    prompt = f"""{INTERVIEW_QUESTION_PROMPT}
+岗位: {data.position}
+{company_context}
+模式: {mode_context}
+技能背景: {data.skills or '未提供'}"""
+    
+    result = ark_call([
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": f"请为{data.position}岗位生成{data.mode}模式面试题"}
+    ], temperature=0.4, max_tokens=4096)
+    
+    if not result["success"]:
+        return {"success": False, "error": result["error"]}
+    
+    parsed = extract_json(result["data"])
+    return {
+        "success": True,
+        "data": parsed or result["data"],
+        "model_used": result["model_used"],
+        "tokens": result["tokens"]
+    }
+
+
+@app.post("/api/interview/feedback")
+async def interview_feedback(data: InterviewAnswer):
+    """评分面试回答"""
+    prompt = f"""{INTERVIEW_FEEDBACK_PROMPT}
+目标岗位: {data.position}
+{ f"目标公司: {data.company}" if data.company else "" }
+面试题类型: {data.question_type or '通用'}
+面试题: {data.question}"""
+    
+    result = ark_call([
+        {"role": "system", "content": prompt},
+        {"role": "user", "content": f"我的回答:\n{data.answer}"}
+    ], temperature=0.3, max_tokens=4096)
+    
+    if not result["success"]:
+        return {"success": False, "error": result["error"]}
+    
+    parsed = extract_json(result["data"])
+    return {
+        "success": True,
+        "data": parsed or result["data"],
+        "model_used": result["model_used"],
+        "tokens": result["tokens"]
+    }
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
