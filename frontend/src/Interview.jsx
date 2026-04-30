@@ -669,31 +669,24 @@ export default function Interview() {
           <div className="flex gap-3 mt-3">
             {!feedback ? (
               <button onClick={submitAnswer} disabled={loading || !answer.trim()}
-                className={`flex-1 py-3 rounded-xl font-semibold text-white transition-all ${loading ? 'bg-blue-400 cursor-wait' : 'bg-blue-600 hover:bg-blue-700 shadow-md'}`}>
+                className="w-full py-3 rounded-xl font-semibold text-white transition-all bg-blue-600 hover:bg-blue-700 shadow-md">
                 {loading ? '⏳ AI深度评估...' : '📊 提交评估'}
               </button>
             ) : (
-              <div className="flex gap-2">
-                <button onClick={nextQuestion}
-                  className={`flex-1 py-3 rounded-xl font-semibold text-white shadow-md transition-all ${
-                    allDone ? 'bg-green-600 hover:bg-green-700' : 'bg-green-600 hover:bg-green-700'
-                  }`}>
-                  {!allDone ? '➡️ 下一题' : '✅ 查看所有反馈'}
-                </button>
+              <div className="flex gap-3">
+                {!allDone && (
+                  <button onClick={nextQuestion}
+                    className="flex-1 py-3 rounded-xl font-semibold text-white shadow-md transition-all bg-green-600 hover:bg-green-700">
+                    ➡️ 下一题
+                  </button>
+                )}
                 {allDone && (
                   <button onClick={finishInterview}
                     className="flex-1 py-3 rounded-xl font-semibold bg-blue-600 text-white shadow-md hover:bg-blue-700 transition-all">
-                    📊 查看总结报告
+                    📊 查看面试总结报告
                   </button>
                 )}
               </div>
-            )}
-            {/* Show summary button when all done and feedback visible */}
-            {allDone && feedback && (
-              <button onClick={finishInterview}
-                className="w-full mt-2 py-2.5 rounded-xl font-semibold bg-indigo-600 text-white shadow-md hover:bg-indigo-700 transition-all text-sm">
-                📊 查看面试总结报告
-              </button>
             )}
           </div>
           {error && <div className="mt-3 p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm">❌ {error}</div>}
@@ -784,6 +777,11 @@ export default function Interview() {
             </div>
           )}
 
+          {feedback && feedback._isPlainText && (
+            <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed p-4 bg-slate-50 rounded-lg">
+              {feedback.raw_text || JSON.stringify(feedback, null, 2)}
+            </div>
+          )}
           {feedback && typeof feedback === 'string' && (
             <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{feedback}</div>
           )}
