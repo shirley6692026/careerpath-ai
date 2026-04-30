@@ -313,6 +313,18 @@ async def interview_feedback(data: InterviewAnswer):
     
     if not r["success"]: return {"success": False, "error": r["error"]}
     parsed = extract_json(r["data"])
+    
+    # 如果没解析出JSON，重试一次（严格强调JSON格式）
+    if not parsed:
+        r2 = ark_call([
+            {"role": "system", "content": feedback_system + "\n\n⚠️ 警告：上一次回答不是有效的JSON！这次必须只返回JSON，不要任何其他文字。"},
+            {"role": "user", "content": f"面试题类型: {data.question_type or '通用'}\n面试题: {data.question}\n\n我的回答:\n{data.answer}"}
+        ], temp=0.2, max_tokens=4096)
+        if r2["success"]:
+            parsed2 = extract_json(r2["data"])
+            if parsed2:
+                return {"success": True, "data": parsed2, "model_used": r2["model_used"], "tokens": r2["tokens"]}
+    
     return {"success": True, "data": parsed or r["data"], "model_used": r["model_used"], "tokens": r["tokens"]}
 
 
@@ -370,12 +382,22 @@ async def interview_summary(data: dict):
     return {"success": True, "data": parsed or r["data"], "model_used": r["model_used"], "tokens": r["tokens"]}
 
 
+
+# 简单内存缓存
+_prep_cache = {}
+_prep_cache_key = ""
+
 @app.post("/api/interview/preparation")
 async def interview_preparation(data: dict):
-    """面试准备建议：礼仪、谈吐、表达、跟进"""
+    global _prep_cache, _prep_cache_key
     position = data.get("position", "")
     domain = data.get("domain", "")
     company = data.get("company", "")
+    cache_key = f"{position}|{domain}|{company}"
+    
+    # 如果缓存命中且相同参数，直接返回
+    if _prep_cache and _prep_cache_key == cache_key:
+        return _prep_cache
     
     prep_prompt = f"""你是面试指导专家。为求职者提供面试全流程建议，返回JSON:
 
