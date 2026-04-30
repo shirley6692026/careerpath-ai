@@ -284,7 +284,7 @@ export default function Interview() {
         <div className="flex items-center justify-center gap-4 mt-2">
           <span className="text-xs text-slate-400">问题 {currentQ + 1}/{questions.length}</span>
           <span className={`text-sm font-mono font-bold ${timerColor}`}>⏱ {Math.floor(timer / 60)}:{String(timer % 60).padStart(2, '0')}</span>
-          /* 模式标签 */
+          
           <span className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full">
             {mode === 'practice' ? '🟢 不限时学习' : mode === 'real' ? '🔴 标准时长' : '🟡 限时挑战'}
           </span>

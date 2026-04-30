@@ -203,82 +203,61 @@ async def skill_radar(data: SkillInput):
 async def interview_generate(data: InterviewRequest):
     if not data.position.strip(): return {"success": False, "error": "岗位为空"}
     
-    ctx = f"岗位: {data.position}"
-    if data.domain: ctx += f"\n行业领域: {data.domain}"
-    if data.company: ctx += f"\n目标公司: {data.company}"
-    ctx += f"\n模式: {'练习(有思路提示)' if data.mode=='practice' else '实战(限时)' if data.mode=='real' else '压力(追问质疑)'}"
-    if data.skills: ctx += f"\n技能背景: {data.skills}"
+    # Build context
+    ctx_parts = [f"岗位: {data.position}"]
+    if data.domain: ctx_parts.append(f"行业领域: {data.domain}")
+    if data.company: ctx_parts.append(f"目标公司: {data.company}")
+    ctx_parts.append(f"模式: {'练习(有思路提示)' if data.mode=='practice' else '实战(限时)' if data.mode=='real' else '压力(追问质疑)'}")
+    if data.skills: ctx_parts.append(f"技能背景: {data.skills}")
     
-    # 简历上下文（核心优化）
-    resume_instruction = ""
+    resume_context = ""
     if data.resume_text and len(data.resume_text) > 10:
-        ctx += f"\n\n候选人简历:\n{data.resume_text[:2000]}"
-        resume_instruction = "\n\n⚠️ 必须基于候选人简历出题！考察其简历中提到的具体技能、项目经历和专业知识。如果简历是机械/能源背景，就出该领域的专业题，不要出互联网产品题。"
+        resume_context = f"\n\n候选人简历信息:\n{data.resume_text[:2000]}\n\n⚠️ 所有面试题必须严格基于以上简历内容出题。"
     
-    # 根据模式选择不同的面试框架
-    framework_instructions = ""
-    if data.mode == "practice":
-        framework_instructions = """
-采用以下结构化面试框架混合出题，每种框架至少1题:
-1. 📖 STAR行为面试: Situation情境-Task任务-Action行动-Result结果，考察真实经历
-2. 🔬 专业技术深挖: 针对简历中的具体技能/项目进行深度追问
-3. 💡 场景案例分析: 给出一个行业真实问题，考察分析解决能力
-4. 🎯 岗位认知: 考察对行业/岗位的理解和职业规划
-5. 🧩 情景判断: 给出工作场景中的两难选择，考察决策逻辑
-6. 📊 数据/指标: 考察用数据驱动决策的能力"""
-    elif data.mode == "real":
-        framework_instructions = """
-采用以下结构化面试框架混合出题:
-1. 📖 STAR行为面试: 追问细节和量化结果
-2. 🔬 压力追问: 对简历中的项目进行连续追问
-3. 💡 案例分析: 限时解决一个行业问题
-4. 🎯 岗位匹配: 考察为什么适合这个岗位
-5. 🧩 优先级排序: 给多个任务要求排序并说明理由"""
-    else:  # pressure
-        framework_instructions = """
-采用压力面试框架:
-1. 🔥 质疑挑战: 对候选人回答进行连续质疑，测试抗压能力
-2. 🎭 角色扮演: 模拟工作中的冲突场景
-3. ⏰ 限时决策: 极短时间内做出关键决策
-4. 🔄 反转提问: 突然改变问题的方向
-5. 💢 否定反馈: 给出负面反馈看候选人如何应对"""
+    # Framework selection by mode
+    frameworks = {
+        "practice": "采用以下6种面试框架混合出题，每种框架至少1题:\n1. 📖 STAR行为面试: 情境-任务-行动-结果\n2. 🔬 专业技术深挖: 针对简历技能深度追问\n3. 💡 场景案例分析: 给出行业真实问题\n4. 🎯 岗位认知: 考察对行业的理解\n5. 🧩 情景判断: 两难选择考察决策逻辑\n6. 📊 数据分析: 用数据驱动决策的能力",
+        "real": "采用以下5种面试框架混合出题:\n1. 📖 STAR深度追问: 追问细节和量化结果\n2. 🔬 压力追问: 对项目连续追问\n3. 💡 案例分析: 限时解决行业问题\n4. 🎯 岗位匹配: 为什么适合该岗位\n5. 🧩 优先级排序: 多任务排序说明理由",
+        "pressure": "采用压力面试5种框架:\n1. 🔥 质疑挑战: 对回答连续质疑\n2. 🎭 角色扮演: 模拟工作中的冲突\n3. ⏰ 限时决策: 极短时间内做关键决策\n4. 🔄 反转提问: 突然改变问题方向\n5. 💢 否定反馈: 给出负面测试应对能力"
+    }
     
-    interview_system = f"""你是行业专业面试官。根据岗位和简历生成3-5个不同框架的面试题。
+    time_limits = {"practice": 600, "real": 300, "pressure": 120}
+    default_time = time_limits.get(data.mode, 180)
+    
+    system_prompt = """你是行业专业面试官。根据岗位和简历生成3-5个不同框架的面试题。
 
 核心规则:
-1. 🎯 行业匹配：【{data.domain or data.position}】领域，问题必须围绕该行业
-2. 📋 基于简历：问题针对简历中的具体项目、技能和经历
-3. 🧠 专业深度：问题要有行业深度，考察真实专业能力
-4. 🚫 禁止跨行业：不得跨行业出题
-5. {{{{mode_desc}}}} 混合出题，确保多样性
+1. 行业匹配：所有问题必须围绕该行业领域
+2. 基于简历：问题针对简历中的具体项目、技能和经历
+3. 专业深度：问题要有行业深度，考察真实专业能力
+4. 禁止跨行业：不得跨行业出题
 
-{framework_instructions}
+""" + frameworks.get(data.mode, frameworks["practice"]) + f"""
 
-按JSON格式:
-{{{{
-  "company_style": "行业风格",
+按JSON格式返回:
+{{
+  "company_style": "行业风格描述",
   "questions": [
-    {{{{
+    {{
       "id": 1,
       "type": "STAR行为/专业技术/场景案例/岗位认知/情景判断/压力挑战",
-      "question": "面试题内容",
+      "question": "面试题内容（必须与行业和简历匹配）",
       "difficulty": "简单/中等/困难",
-      "tips": "按对应框架的解题思路给出提示（练习模式用）",
+      "tips": "按对应框架的解题思路给出提示",
       "framework": "所属框架名称",
       "expected_keywords": ["关键词"],
-      "time_limit": {"practice": 600, "real": 300, "pressure": 120}.get(data.mode, 180)
-    }}}}
+      "time_limit": {default_time}
+    }}
   ],
   "total_duration": "预计时长",
   "focus_areas": ["考察方向1", "方向2"]
-}}}}"""
+}}"""
     
-    # Build system prompt with all context
-    system_prompt = interview_system
-    if data.resume_text:
-        system_prompt += f"\n\n候选人简历信息:\n{data.resume_text[:2000]}\n\n⚠️ 所有面试题必须严格基于以上简历内容出题，考察候选人简历中提到的具体技能、项目和经历。"
+    # Add domain and resume context
     if data.domain:
         system_prompt += f"\n\n⚠️ 行业领域为【{data.domain}】，问题必须围绕该领域，不得跨行业。"
+    if resume_context:
+        system_prompt += resume_context
     
     r = ark_call([
         {"role": "system", "content": system_prompt},
@@ -288,51 +267,53 @@ async def interview_generate(data: InterviewRequest):
     if not r["success"]: return {"success": False, "error": r["error"]}
     parsed = extract_json(r["data"])
     return {"success": True, "data": parsed or r["data"], "model_used": r["model_used"], "tokens": r["tokens"]}
-
-
 @app.post("/api/interview/feedback")
 async def interview_feedback(data: InterviewAnswer):
-    ctx = f"目标岗位: {data.position}"
-    if data.domain: ctx += f"\n行业领域: {data.domain}"
-    if data.company: ctx += f"\n目标公司: {data.company}"
-    if data.resume_context: ctx += f"\n候选人背景: {data.resume_context[:1000]}"
+    ctx_parts = [f"目标岗位: {data.position}"]
+    if data.domain: ctx_parts.append(f"行业领域: {data.domain}")
+    if data.company: ctx_parts.append(f"目标公司: {data.company}")
+    if data.resume_context: ctx_parts.append(f"候选人背景: {data.resume_context[:1000]}")
     
-    interview_type_desc = {"practice": "练习模式", "real": "实战模式", "pressure": "压力模式"}.get(data.mode if hasattr(data,'mode') else 'practice', '通用')
+    mode_label = {"practice": "练习模式", "real": "实战模式", "pressure": "压力模式"}
+    mode_desc = getattr(data, 'mode', 'practice')
     
-    feedback_system = f"""你是专业的面试评分专家。评估候选人的回答，必须提供候选人不知道的新知识和深度分析。
+    feedback_system = """你是专业的面试评分专家。评估候选人的回答，必须提供候选人不知道的新知识和深度分析。
 
 核心规则:
-1. ❌ 禁止重复候选人的回答内容
-2. ✅ "参考答案"必须包含候选人没有提到的行业洞见和专业深度
-3. ✅ 从该行业的实际工作场景出发，提供真实的、有深度的专业知识
-4. ✅ 如果候选人的回答正确但过于浅显，追问深层问题
-5. ✅ 从行业最佳实践、前沿技术、常见误区等角度补充新知识
+1. 禁止重复候选人的回答内容
+2. "参考答案"必须包含候选人没有提到的行业洞见和专业深度
+3. 从该行业的实际工作场景出发，提供真实的、有深度的专业知识
+4. 如果候选人的回答正确但过于浅显，追问深层问题
+5. 从行业最佳实践、前沿技术、常见误区等角度补充新知识
 
 返回JSON:
-{{{{
+{
   "score": 7,
-  "overall": "总体评价（一句话）",
-  "strengths": ["优点1（候选人的亮点）"],
-  "weaknesses": ["不足1（候选人没考虑到的地方）"],
-  "dimensions": {{{{
-    "professional": {{{{"score": 7, "comment": "专业能力评价"}}}},
-    "communication": {{{{"score": 8, "comment": "沟通表达"}}}},
-    "logic": {{{{"score": 7, "comment": "逻辑思维"}}}},
-    "fit": {{{{"score": 6, "comment": "岗位匹配"}}}}
-  }}}},
-  "improved_answer": "优化后的完整参考答案。⚠️ 必须包含候选人没有提到的行业知识、专业深度和全新视角。如果候选人提到了A,参考答案必须包含B+C+D。",
-  "next_question_hint": "基于候选人回答的下一层深入追问方向。注意：不是重复问，而是深入追问候选人没有回答清楚的部分。"
-}}}}只返回JSON。"""
+  "overall": "总体评价",
+  "strengths": ["优点1", "优点2"],
+  "weaknesses": ["不足1", "不足2"],
+  "dimensions": {
+    "professional": {"score": 7, "comment": "专业能力评价"},
+    "communication": {"score": 8, "comment": "沟通表达"},
+    "logic": {"score": 7, "comment": "逻辑思维"},
+    "fit": {"score": 6, "comment": "岗位匹配"}
+  },
+  "improved_answer": "优化后的参考答案。必须包含候选人没有提到的行业知识和全新视角。如果候选人提到了A，参考答案必须包含B+C+D。",
+  "next_question_hint": "基于回答的下一层深入追问方向。注意不是重复问，而是深入追问候选人没回答清楚的部分。"
+}
+只返回JSON。"""
+    
+    if data.domain:
+        feedback_system += f"\n注意：候选人是{data.domain}领域，评价要符合该行业标准。"
     
     r = ark_call([
-        {"role": "system", "content": feedback_system + f"\n注意：候选人是{data.domain or '通用'}领域，评价要符合该行业标准。"},
+        {"role": "system", "content": feedback_system},
         {"role": "user", "content": f"面试题类型: {data.question_type or '通用'}\n面试题: {data.question}\n\n我的回答:\n{data.answer}"}
     ], temp=0.3, max_tokens=4096)
     
     if not r["success"]: return {"success": False, "error": r["error"]}
     parsed = extract_json(r["data"])
     return {"success": True, "data": parsed or r["data"], "model_used": r["model_used"], "tokens": r["tokens"]}
-
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
