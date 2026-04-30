@@ -53,6 +53,12 @@ export default function Interview() {
   const [timerRunning, setTimerRunning] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [history, setHistory] = useState([]);
+  const [showSummary, setShowSummary] = useState(false);
+  const [summary, setSummary] = useState(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [prepData, setPrepData] = useState(null);
+  const [showPrep, setShowPrep] = useState(false);
+  const [prepLoading, setPrepLoading] = useState(false);
   const recognitionRef = useRef(null);
   const timerRef = useRef(null);
 
