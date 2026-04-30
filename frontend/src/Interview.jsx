@@ -250,7 +250,11 @@ export default function Interview() {
       setCurrentQ(p => p + 1); setAnswer(''); setFeedback(null);
       const next = questions[currentQ + 1];
       startTimer(next?.time_limit || MODE_DETAILS[mode].time);
-    } else setStep('setup');
+    } else {
+      // All questions answered - show summary
+      setShowSummary(true);
+      setTimeout(() => generateSummary(), 100);
+    }
   };
 
   const q = questions[currentQ];
@@ -601,9 +605,8 @@ export default function Interview() {
           <span className="text-[10px] px-2 py-0.5 bg-slate-100 text-slate-500 rounded-full">
             {mode === 'practice' ? '🟢 不限时学习' : mode === 'real' ? '🔴 标准时长' : '🟡 限时挑战'}
           </span>
-          <button onClick={() => setStep('setup')} className="text-xs px-3 py-1 bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200">
-            重新开始
-          </button>
+          <button onClick={() => setStep('setup')} className="text-xs px-3 py-1 bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200">重新开始</button>
+          <button onClick={loadPreparation} className="text-xs px-3 py-1 bg-green-100 text-green-600 rounded-full hover:bg-green-200">📋 面试指南</button>
         </div>
       </div>
 
