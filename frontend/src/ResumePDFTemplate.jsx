@@ -1,8 +1,10 @@
-// 专业简历PDF模板 — 美观设计版
-// 灵感来源: Canva / Novoresume / Resume.io 顶级模板
+// 专业简历PDF模板 v2 — 简洁单栏设计
+// 设计原则: 白底为主、蓝底白字标题、单栏清晰、照片区右上
 
 export function generateResumeHTML(resumeData) {
-  const { name, title, contact, sections, skills, score } = resumeData;
+  const { name, title, contact, sections, skills, score, photoUrl } = resumeData;
+  
+  const hasPhoto = !!photoUrl;
   
   return `<!DOCTYPE html>
 <html>
@@ -10,158 +12,137 @@ export function generateResumeHTML(resumeData) {
   <meta charset="UTF-8">
   <title>${name || '简历'}</title>
   <style>
-    @page { size: A4; margin: 0; }
+    @page { size: A4; margin: 15mm; }
     
     * { margin: 0; padding: 0; box-sizing: border-box; }
     
     body {
       font-family: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
-      font-size: 10pt;
-      line-height: 1.5;
-      color: #2c3e50;
-      background: #fff;
+      font-size: 10.5pt;
+      line-height: 1.6;
+      color: #2d3748;
+      background: #f7fafc;
     }
     
     .resume {
-      width: 210mm;
-      min-height: 297mm;
+      width: 180mm;
       margin: 0 auto;
       background: #fff;
-      display: flex;
+      padding: 12mm;
+      min-height: 267mm;
     }
     
-    /* 左侧边栏 */
-    .sidebar {
-      width: 72mm;
-      background: #1a365d;
-      color: #fff;
-      padding: 25mm 8mm 20mm 8mm;
-      min-height: 297mm;
+    /* 顶部个人信息区 */
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 8mm;
+      padding-bottom: 5mm;
+      border-bottom: 2px solid #3182ce;
     }
     
-    .profile-img {
-      width: 45mm;
-      height: 45mm;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.15);
-      margin: 0 auto 6mm;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 24pt;
-      border: 3px solid rgba(255,255,255,0.3);
+    .header-left {
+      flex: 1;
     }
     
     .name {
-      font-size: 16pt;
+      font-size: 22pt;
       font-weight: 700;
-      text-align: center;
+      color: #1a365d;
       margin-bottom: 2mm;
-      letter-spacing: 1px;
+      letter-spacing: 2px;
     }
     
     .title {
-      font-size: 10pt;
-      text-align: center;
-      opacity: 0.85;
-      margin-bottom: 8mm;
-      font-weight: 300;
+      font-size: 12pt;
+      color: #4a5568;
+      margin-bottom: 3mm;
     }
     
-    .sidebar-section {
-      margin-bottom: 8mm;
-    }
-    
-    .sidebar-title {
+    .contact-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 3mm;
       font-size: 9pt;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 2px;
-      margin-bottom: 4mm;
-      padding-bottom: 2mm;
-      border-bottom: 1px solid rgba(255,255,255,0.2);
+      color: #718096;
     }
     
     .contact-item {
       display: flex;
       align-items: center;
-      gap: 2mm;
-      margin-bottom: 2mm;
-      font-size: 9pt;
-      opacity: 0.9;
+      gap: 1mm;
     }
     
-    .contact-icon {
-      width: 5mm;
-      text-align: center;
-    }
-    
-    .skill-item {
-      margin-bottom: 3mm;
-    }
-    
-    .skill-name {
-      font-size: 9pt;
-      margin-bottom: 1mm;
-    }
-    
-    .skill-bar {
-      height: 2mm;
-      background: rgba(255,255,255,0.2);
-      border-radius: 1mm;
-      overflow: hidden;
-    }
-    
-    .skill-fill {
-      height: 100%;
-      background: #63b3ed;
-      border-radius: 1mm;
-    }
-    
-    .tag {
-      display: inline-block;
-      background: rgba(255,255,255,0.15);
-      padding: 1mm 3mm;
+    /* 照片区 */
+    .photo-area {
+      width: 30mm;
+      height: 38mm;
+      border: 2px dashed #cbd5e0;
       border-radius: 2mm;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #f7fafc;
+      margin-left: 5mm;
+      flex-shrink: 0;
+    }
+    
+    .photo-area.has-photo {
+      border: none;
+      background: transparent;
+    }
+    
+    .photo-area img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      border-radius: 2mm;
+    }
+    
+    .photo-placeholder {
+      text-align: center;
+      color: #a0aec0;
       font-size: 8pt;
-      margin: 1mm;
     }
     
-    /* 右侧主内容 */
-    .main {
-      flex: 1;
-      padding: 20mm 10mm 20mm 10mm;
-      background: #fff;
+    .photo-placeholder .icon {
+      font-size: 20pt;
+      margin-bottom: 2mm;
     }
     
-    .main-section {
-      margin-bottom: 8mm;
+    /* 蓝底白字模块标题 */
+    .section {
+      margin-bottom: 6mm;
     }
     
-    .main-title {
-      font-size: 12pt;
-      font-weight: 700;
-      color: #1a365d;
-      margin-bottom: 4mm;
-      padding-bottom: 2mm;
-      border-bottom: 2px solid #e2e8f0;
+    .section-title {
+      background: #2c5282;
+      color: #fff;
+      font-size: 11pt;
+      font-weight: 600;
+      padding: 2mm 4mm;
+      margin-bottom: 3mm;
+      letter-spacing: 1px;
       display: flex;
       align-items: center;
       gap: 2mm;
     }
     
-    .main-title::after {
+    .section-title::before {
       content: '';
-      flex: 1;
-      height: 1px;
-      background: #e2e8f0;
-      margin-left: 3mm;
+      width: 3mm;
+      height: 3mm;
+      background: #63b3ed;
+      border-radius: 50%;
     }
     
-    .experience-item {
-      margin-bottom: 5mm;
+    /* 经历条目 */
+    .exp-item {
+      margin-bottom: 4mm;
       padding-left: 3mm;
-      border-left: 2px solid #63b3ed;
+      border-left: 2px solid #e2e8f0;
     }
     
     .exp-header {
@@ -173,144 +154,166 @@ export function generateResumeHTML(resumeData) {
     
     .exp-title {
       font-weight: 600;
-      font-size: 10pt;
+      font-size: 10.5pt;
       color: #2d3748;
     }
     
     .exp-date {
-      font-size: 8pt;
+      font-size: 8.5pt;
       color: #718096;
       font-style: italic;
     }
     
-    .exp-company {
-      font-size: 9pt;
+    .exp-subtitle {
+      font-size: 9.5pt;
       color: #4a5568;
       margin-bottom: 1mm;
     }
     
     .exp-desc {
-      font-size: 9pt;
+      font-size: 9.5pt;
       color: #4a5568;
-      line-height: 1.6;
+      line-height: 1.5;
     }
     
     .exp-desc li {
-      margin-bottom: 1mm;
+      margin-bottom: 0.5mm;
       list-style-position: inside;
     }
     
-    .highlight-box {
+    /* 技能标签 */
+    .skills-container {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 2mm;
+    }
+    
+    .skill-tag {
       background: #ebf8ff;
-      border-left: 3px solid #3182ce;
-      padding: 3mm;
-      margin: 3mm 0;
-      border-radius: 0 2mm 2mm 0;
-    }
-    
-    .score-badge {
-      display: inline-block;
-      background: #1a365d;
-      color: #fff;
+      color: #2c5282;
       padding: 1mm 3mm;
-      border-radius: 2mm;
-      font-size: 8pt;
-      font-weight: 600;
+      border-radius: 1mm;
+      font-size: 9pt;
+      border: 1px solid #bee3f8;
     }
     
-    .footer {
-      position: absolute;
-      bottom: 5mm;
-      left: 80mm;
-      right: 10mm;
+    .skill-tag.highlight {
+      background: #2c5282;
+      color: #fff;
+      border-color: #2c5282;
+    }
+    
+    /* AI评分区 */
+    .score-banner {
+      background: #ebf8ff;
+      border: 1px solid #90cdf4;
+      border-radius: 2mm;
+      padding: 3mm;
+      margin-top: 5mm;
       text-align: center;
-      font-size: 7pt;
-      color: #a0aec0;
+    }
+    
+    .score-label {
+      font-size: 8pt;
+      color: #4a5568;
+      margin-bottom: 1mm;
+    }
+    
+    .score-value {
+      font-size: 18pt;
+      font-weight: 700;
+      color: #2c5282;
+    }
+    
+    .score-note {
+      font-size: 7.5pt;
+      color: #718096;
+      margin-top: 1mm;
+    }
+    
+    /* 页脚 */
+    .footer {
+      margin-top: 8mm;
+      padding-top: 3mm;
       border-top: 1px solid #e2e8f0;
-      padding-top: 2mm;
+      text-align: center;
+      font-size: 7.5pt;
+      color: #a0aec0;
     }
     
     @media print {
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      body { background: #fff; }
+      .resume { width: 100%; padding: 0; }
     }
   </style>
 </head>
 <body>
   <div class="resume">
-    <!-- 左侧边栏 -->
-    <div class="sidebar">
-      <div class="profile-img">👤</div>
-      <div class="name">${name || '姓名'}</div>
-      <div class="title">${title || '求职意向'}</div>
-      
-      <div class="sidebar-section">
-        <div class="sidebar-title">联系方式</div>
-        ${contact ? contact.map(c => `
-          <div class="contact-item">
-            <span class="contact-icon">${c.icon}</span>
-            <span>${c.value}</span>
-          </div>
-        `).join('') : ''}
-      </div>
-      
-      <div class="sidebar-section">
-        <div class="sidebar-title">专业技能</div>
-        ${skills ? skills.map(s => `
-          <div class="skill-item">
-            <div class="skill-name">${s.name}</div>
-            <div class="skill-bar">
-              <div class="skill-fill" style="width: ${s.level}%;"></div>
+    <!-- 顶部个人信息 -->
+    <div class="header">
+      <div class="header-left">
+        <div class="name">${name || '姓名'}</div>
+        <div class="title">${title || '求职意向：待填写'}</div>
+        <div class="contact-row">
+          ${contact ? contact.map(c => `
+            <div class="contact-item">
+              <span>${c.icon}</span>
+              <span>${c.value}</span>
             </div>
-          </div>
-        `).join('') : ''}
-      </div>
-      
-      <div class="sidebar-section">
-        <div class="sidebar-title">其他技能</div>
-        <div>
-          ${skills ? skills.filter(s => !s.level).map(s => `
-            <span class="tag">${s.name}</span>
-          `).join('') : ''}
+          `).join('') : '<div class="contact-item">📱 电话 | ✉️ 邮箱 | 📍 地址</div>'}
         </div>
       </div>
       
-      ${score ? `
-      <div class="sidebar-section">
-        <div class="sidebar-title">AI评分</div>
-        <div style="text-align: center;">
-          <div style="font-size: 24pt; font-weight: 700;">${score}</div>
-          <div style="font-size: 8pt; opacity: 0.7;">CareerPath AI 评分</div>
-        </div>
+      <!-- 照片区 -->
+      <div class="photo-area ${hasPhoto ? 'has-photo' : ''}">
+        ${hasPhoto 
+          ? `<img src="${photoUrl}" alt="照片" />`
+          : `<div class="photo-placeholder">
+              <div class="icon">👤</div>
+              <div>一寸照</div>
+              <div style="font-size:7pt">(可粘贴)</div>
+            </div>`
+        }
       </div>
-      ` : ''}
     </div>
     
-    <!-- 右侧主内容 -->
-    <div class="main">
-      ${sections ? sections.map(sec => `
-        <div class="main-section">
-          <div class="main-title">${sec.title}</div>
-          ${sec.items ? sec.items.map(item => `
-            <div class="experience-item">
-              <div class="exp-header">
-                <span class="exp-title">${item.title}</span>
-                <span class="exp-date">${item.date || ''}</span>
-              </div>
-              <div class="exp-company">${item.subtitle || ''}</div>
-              <div class="exp-desc">${item.description || ''}</div>
+    <!-- 模块内容 -->
+    ${sections ? sections.map(sec => `
+      <div class="section">
+        <div class="section-title">${sec.title}</div>
+        ${sec.items ? sec.items.map(item => `
+          <div class="exp-item">
+            <div class="exp-header">
+              <span class="exp-title">${item.title}</span>
+              <span class="exp-date">${item.date || ''}</span>
             </div>
-          `).join('') : ''}
-        </div>
-      `).join('') : ''}
-      
-      <div class="highlight-box">
-        <strong>🤖 AI优化亮点：</strong>本简历由 CareerPath AI 智能优化生成，基于 McKinsey/Deloitte/Gartner/WEF 2025 研究标准，针对目标岗位精准匹配关键词和技能。
+            <div class="exp-subtitle">${item.subtitle || ''}</div>
+            <div class="exp-desc">${item.description || ''}</div>
+          </div>
+        `).join('') : ''}
+        
+        ${sec.type === 'skills' && sec.skillTags ? `
+          <div class="skills-container">
+            ${sec.skillTags.map(tag => `
+              <span class="skill-tag ${tag.highlight ? 'highlight' : ''}">${tag.name}</span>
+            `).join('')}
+          </div>
+        ` : ''}
       </div>
+    `).join('') : ''}
+    
+    <!-- AI评分 -->
+    ${score ? `
+    <div class="score-banner">
+      <div class="score-label">🤖 CareerPath AI 智能评分</div>
+      <div class="score-value">${score}/10</div>
+      <div class="score-note">基于 McKinsey · Deloitte · Gartner · WEF 2025 HR研究标准</div>
     </div>
-  </div>
-  
-  <div class="footer">
-    由 CareerPath AI 简历工坊生成 | 基于全球四大机构 2025 HR 研究标准
+    ` : ''}
+    
+    <div class="footer">
+      本简历由 CareerPath AI 简历工坊智能优化生成
+    </div>
   </div>
 </body>
 </html>`;
@@ -320,47 +323,57 @@ export function generateResumeHTML(resumeData) {
 export function parseResumeToStructured(text) {
   const lines = text.split('\n').filter(l => l.trim());
   
-  // 尝试提取姓名（第一行或包含"姓名"的行）
-  let name = lines[0]?.trim() || '姓名';
-  if (name.length > 10) name = '姓名';
-  
-  // 尝试提取求职意向
-  let title = '';
-  for (const line of lines) {
-    if (line.includes('求职') || line.includes('意向') || line.includes('应聘')) {
-      title = line.replace(/.*[:：]/, '').trim();
+  // 提取姓名
+  let name = '';
+  for (const line of lines.slice(0, 5)) {
+    if (line.trim() && line.length < 15 && !line.includes('求职') && !line.includes('意向')) {
+      name = line.trim();
       break;
     }
   }
+  if (!name) name = '姓名';
+  
+  // 提取求职意向
+  let title = '';
+  for (const line of lines) {
+    if (line.includes('求职') || line.includes('意向') || line.includes('应聘') || line.includes('目标')) {
+      title = line.replace(/.*[:：]/, '').trim();
+      if (title) break;
+    }
+  }
+  if (!title) title = '求职意向：待填写';
   
   // 提取联系方式
   const contact = [];
   for (const line of lines) {
-    if (line.includes('电话') || line.includes('手机') || /\d{11}/.test(line)) {
-      const phone = line.match(/\d{11}/)?.[0];
-      if (phone) contact.push({ icon: '📱', value: phone });
+    const phoneMatch = line.match(/(\d{3}[-\s]?\d{4}[-\s]?\d{4}|\d{11})/);
+    if (phoneMatch && !contact.find(c => c.type === 'phone')) {
+      contact.push({ icon: '📱', value: phoneMatch[0], type: 'phone' });
     }
-    if (line.includes('邮箱') || line.includes('@')) {
-      const email = line.match(/[\w.-]+@[\w.-]+\.\w+/)?.[0];
-      if (email) contact.push({ icon: '✉️', value: email });
+    const emailMatch = line.match(/[\w.-]+@[\w.-]+\.\w+/);
+    if (emailMatch && !contact.find(c => c.type === 'email')) {
+      contact.push({ icon: '✉️', value: emailMatch[0], type: 'email' });
+    }
+    if ((line.includes('地址') || line.includes('居住地')) && !contact.find(c => c.type === 'address')) {
+      contact.push({ icon: '📍', value: line.replace(/.*[:：]/, '').trim() || '地址', type: 'address' });
     }
   }
   
   // 提取技能
-  const skills = [];
+  const skillTags = [];
   let inSkillsSection = false;
   for (const line of lines) {
-    if (line.includes('技能') || line.includes('技术')) {
+    if (line.includes('技能') || line.includes('技术栈') || line.includes('掌握')) {
       inSkillsSection = true;
       continue;
     }
-    if (inSkillsSection && line.trim() && !line.includes('经历') && !line.includes('项目')) {
-      const skillNames = line.split(/[,，、]/).map(s => s.trim()).filter(s => s);
-      skillNames.forEach(s => {
-        skills.push({ name: s, level: Math.floor(Math.random() * 30) + 70 });
+    if (inSkillsSection && line.trim() && !line.includes('经历') && !line.includes('项目') && !line.includes('教育')) {
+      const skills = line.split(/[,，、;；]/).map(s => s.trim()).filter(s => s && s.length < 20);
+      skills.forEach(s => {
+        skillTags.push({ name: s, highlight: false });
       });
     }
-    if (inSkillsSection && (line.includes('经历') || line.includes('项目'))) {
+    if (inSkillsSection && (line.includes('经历') || line.includes('项目') || line.includes('教育'))) {
       inSkillsSection = false;
     }
   }
@@ -369,31 +382,54 @@ export function parseResumeToStructured(text) {
   const sections = [];
   let currentSection = null;
   
+  const sectionMap = {
+    '教育': { title: '🎓 教育背景', type: 'education' },
+    '学历': { title: '🎓 教育背景', type: 'education' },
+    '学校': { title: '🎓 教育背景', type: 'education' },
+    '经历': { title: '💼 工作经历', type: 'work' },
+    '工作': { title: '💼 工作经历', type: 'work' },
+    '实习': { title: '💼 实习经历', type: 'work' },
+    '项目': { title: '🚀 项目经验', type: 'project' },
+    '荣誉': { title: '🏆 荣誉奖项', type: 'honor' },
+    '奖项': { title: '🏆 荣誉奖项', type: 'honor' },
+    '证书': { title: '📜 证书资质', type: 'cert' },
+    '评价': { title: '📝 自我评价', type: 'evaluation' },
+    '总结': { title: '📝 自我评价', type: 'evaluation' },
+    '技能': { title: '💡 专业技能', type: 'skills' }
+  };
+  
   for (const line of lines) {
-    if (line.includes('教育') || line.includes('学历')) {
-      if (currentSection) sections.push(currentSection);
-      currentSection = { title: '🎓 教育背景', items: [] };
-    } else if (line.includes('经历') || line.includes('工作')) {
-      if (currentSection) sections.push(currentSection);
-      currentSection = { title: '💼 工作经历', items: [] };
-    } else if (line.includes('项目')) {
-      if (currentSection) sections.push(currentSection);
-      currentSection = { title: '🚀 项目经验', items: [] };
-    } else if (line.includes('荣誉') || line.includes('奖项')) {
-      if (currentSection) sections.push(currentSection);
-      currentSection = { title: '🏆 荣誉奖项', items: [] };
-    } else if (line.includes('评价') || line.includes('总结')) {
-      if (currentSection) sections.push(currentSection);
-      currentSection = { title: '📝 自我评价', items: [] };
-    } else if (currentSection) {
-      currentSection.items.push({
-        title: line.trim(),
-        description: line.trim()
-      });
+    let foundSection = false;
+    for (const [keyword, config] of Object.entries(sectionMap)) {
+      if (line.includes(keyword) && line.length < 20) {
+        if (currentSection) sections.push(currentSection);
+        currentSection = { title: config.title, type: config.type, items: [] };
+        if (config.type === 'skills') {
+          currentSection.skillTags = [];
+        }
+        foundSection = true;
+        break;
+      }
+    }
+    
+    if (!foundSection && currentSection) {
+      if (currentSection.type === 'skills') {
+        const skills = line.split(/[,，、;；]/).map(s => s.trim()).filter(s => s && s.length < 20);
+        skills.forEach(s => {
+          currentSection.skillTags.push({ name: s, highlight: false });
+        });
+      } else {
+        currentSection.items.push({
+          title: line.trim(),
+          subtitle: '',
+          description: line.trim(),
+          date: ''
+        });
+      }
     }
   }
   
   if (currentSection) sections.push(currentSection);
   
-  return { name, title, contact, skills, sections };
+  return { name, title, contact, sections, skillTags };
 }

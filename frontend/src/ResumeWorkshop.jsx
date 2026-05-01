@@ -3,14 +3,7 @@ import { API_BASE } from './services/api';
 import { generateResumeHTML, parseResumeToStructured } from './ResumePDFTemplate';
 import html2pdf from 'html2pdf.js';
 
-// Resume Workshop v3 — 基于用户反馈深度优化
-// 优化点:
-// 1. 支持目标岗位JD输入
-// 2. 简历模块化解析展示
-// 3. 10分制评分
-// 4. 诊断不重复评分
-// 5. 优化后10分制评分 + "AI生成新简历"按钮
-// 6. 对比效果改为"AI生成新简历"
+// Resume Workshop v3.1 — PDF预览优化版
 
 const SECTIONS = [
   { id: 'upload', label: '📄 上传简历' },
@@ -20,7 +13,6 @@ const SECTIONS = [
   { id: 'newresume', label: '📝 AI生成新简历' },
 ];
 
-// 模块名称映射
 const MODULE_NAMES = {
   personal: '👤 个人信息',
   education: '🎓 教育经历',
@@ -41,14 +33,16 @@ export default function ResumeWorkshop() {
   const [jobJd, setJobJd] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [showPreview, setShowPreview] = useState(false); // v3.1: 预览弹窗
+  const [previewHtml, setPreviewHtml] = useState(''); // v3.1: 预览内容
 
-  // Results
   const [initialScore, setInitialScore] = useState(null);
   const [diagnosisResult, setDiagnosisResult] = useState(null);
   const [optimizeResult, setOptimizeResult] = useState(null);
   const [newScore, setNewScore] = useState(null);
 
   const fileInputRef = useRef(null);
+  const previewRef = useRef(null); // v3.1: 预览DOM引用
 
   // ========== 上传简历 ==========
   const handleUpload = async (e) => {
@@ -167,23 +161,28 @@ export default function ResumeWorkshop() {
     }
   };
 
-  // ========== 生成PDF ==========
-  const handleGeneratePDF = async () => {
+  // ========== 生成PDF预览 ==========
+  const handlePreview = async () => {
     if (!optimizeResult?.optimized_text) { setError('请先优化简历'); return; }
     
     try {
-      // 使用结构化数据生成美观PDF
       const resumeData = parseResumeToStructured(optimizeResult.optimized_text);
       resumeData.score = newScore?.new_overall_score || initialScore?.overall_score;
       
       const html = generateResumeHTML(resumeData);
-      
-      // 创建临时容器
-      const element = document.createElement('div');
-      element.innerHTML = html;
-      document.body.appendChild(element);
-      
-      // 使用html2pdf生成PDF
+      setPreviewHtml(html);
+      setShowPreview(true);
+    } catch (err) {
+      setError('预览生成失败: ' + err.message);
+    }
+  };
+
+  // ========== 下载PDF ==========
+  const handleDownloadPDF = async () => {
+    try {
+      const element = previewRef.current;
+      if (!element) return;
+
       const opt = {
         margin: 0,
         filename: `${targetJob || '优化'}简历.pdf`,
@@ -193,16 +192,53 @@ export default function ResumeWorkshop() {
       };
       
       await html2pdf().set(opt).from(element).save();
-      
-      document.body.removeChild(element);
     } catch (err) {
-      setError('PDF生成失败: ' + err.message);
+      setError('PDF下载失败: ' + err.message);
     }
   };
 
   // ========== 渲染 ==========
   return (
     <div className="max-w-5xl mx-auto p-6">
+      {/* 预览弹窗 */}
+      {showPreview && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center p-4 border-b">
+              <h3 className="text-lg font-semibold">📄 简历预览</h3>
+              <button 
+                onClick={() => setShowPreview(false)}
+                className="text-gray-500 hover:text-gray-700 text-xl"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex-1 overflow-auto p-4 bg-gray-100">
+              <div 
+                ref={previewRef}
+                dangerouslySetInnerHTML={{ __html: previewHtml }}
+                className="mx-auto"
+                style={{ width: '210mm' }}
+              />
+            </div>
+            <div className="p-4 border-t flex gap-3 justify-center">
+              <button
+                onClick={() => setShowPreview(false)}
+                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+              >
+                关闭预览
+              </button>
+              <button
+                onClick={handleDownloadPDF}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold"
+              >
+                📥 下载PDF
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="mb-8">
         <h1 className="text-3xl font-bold mb-2">📄 简历工坊</h1>
         <p className="text-gray-600">基于AI+HR研究成果的专业简历优化系统</p>
@@ -264,7 +300,7 @@ export default function ResumeWorkshop() {
             </button>
           </div>
 
-          {/* 模块化解析展示 — 放在目标岗位信息上面 */}
+          {/* 模块化解析展示 */}
           {modules && (
             <div className="bg-white rounded-xl shadow-sm border p-6">
               <h3 className="text-lg font-semibold mb-4">📋 简历模块化解析</h3>
@@ -311,7 +347,7 @@ export default function ResumeWorkshop() {
             </div>
           )}
 
-          {/* 查看初评评分按钮 — 放在最底下 */}
+          {/* 查看初评评分按钮 */}
           {resumeText && (
             <button
               onClick={handleScore}
@@ -452,7 +488,7 @@ export default function ResumeWorkshop() {
             </div>
           ) : (
             <>
-              {/* 初评分数展示 (只展示，不重新评分) */}
+              {/* 初评分数展示 */}
               {initialScore && (
                 <div className="bg-white rounded-xl shadow-sm border p-6">
                   <h3 className="text-lg font-semibold mb-4">📊 初评分数</h3>
@@ -709,7 +745,7 @@ export default function ResumeWorkshop() {
                 </div>
                 
                 <button
-                  onClick={handleGeneratePDF}
+                  onClick={handlePreview}
                   className="mt-4 w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition font-semibold text-lg"
                 >
                   📄 生成PDF简历
