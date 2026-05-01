@@ -174,13 +174,10 @@ export function generateResumeHTML(resumeData) {
         <div class="section-title">${sec.title}</div>
         ${sec.items ? sec.items.map(item => `
           <div class="exp-item">
-            ${item.title || item.date ? `
-            <div class="exp-header">
-              ${item.title ? `
-                <span class="${item.titleBold === false ? 'exp-title-normal' : 'exp-title'}">${item.title}</span>
-              ` : ''}
-              ${item.date ? `<span class="exp-date">${item.date}</span>` : ''}
-            </div>` : ''}
+            ${item.date ? `<div class="exp-date" style="margin-bottom: 1mm;">${item.date}</div>` : ''}
+            ${item.title ? `
+              <div class="${item.titleBold === false ? 'exp-title-normal' : 'exp-title'}" style="margin-bottom: 0.5mm;">${item.title}</div>
+            ` : ''}
             ${item.subtitle ? `<div class="exp-subtitle">${item.subtitle}</div>` : ''}
             ${item.description ? `<div class="exp-desc">${item.description}</div>` : ''}
           </div>
