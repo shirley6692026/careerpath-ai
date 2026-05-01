@@ -203,28 +203,31 @@ export default function ResumeWorkshop() {
     <div className="max-w-5xl mx-auto p-6">
       {/* 预览弹窗 */}
       {showPreview && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex flex-col">
-          <div className="bg-white shadow-2xl flex-1 flex flex-col max-w-4xl mx-auto w-full">
-            <div className="flex justify-between items-center px-6 py-3 border-b bg-white">
-              <h3 className="text-lg font-semibold">📄 简历预览</h3>
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center pt-4 pb-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-[850px] max-h-[95vh] flex flex-col">
+            {/* 顶部关闭按钮 */}
+            <div className="flex justify-end items-center px-4 py-2 border-b bg-gray-50 rounded-t-xl">
               <button 
                 onClick={() => setShowPreview(false)}
-                className="text-gray-500 hover:text-gray-700 text-xl px-2"
+                className="text-gray-400 hover:text-gray-600 text-2xl leading-none p-1"
+                title="关闭"
               >
                 ✕
               </button>
             </div>
             
-            <div className="flex-1 overflow-auto p-6 bg-gray-100">
+            {/* 可滚动内容区 */}
+            <div className="flex-1 overflow-y-auto p-4 bg-gray-100">
               <div 
                 ref={previewRef}
                 dangerouslySetInnerHTML={{ __html: previewHtml }}
-                className="mx-auto shadow-lg"
-                style={{ width: '210mm', minHeight: '297mm' }}
+                className="mx-auto"
+                style={{ width: '210mm' }}
               />
             </div>
             
-            <div className="px-6 py-4 border-t bg-white flex gap-4 justify-center">
+            {/* 底部按钮 - 固定可见 */}
+            <div className="px-6 py-4 border-t bg-white rounded-b-xl flex gap-4 justify-center shrink-0">
               <button
                 onClick={() => setShowPreview(false)}
                 className="px-8 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium"
