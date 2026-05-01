@@ -1,4 +1,4 @@
-// 专业简历PDF模板 v5 — 修复解析BUG
+// 专业简历PDF模板 v6 — 修复日期重复和位置错误BUG
 
 export function generateResumeHTML(resumeData) {
   const { name, title, contact, sections, targetJob } = resumeData;
@@ -100,11 +100,14 @@ export function generateResumeHTML(resumeData) {
       font-weight: 600;
       font-size: 10pt;
       color: #1d1d1f;
+      flex: 1;
     }
     .exp-date {
       font-size: 8.5pt;
       color: #86868b;
       font-weight: 400;
+      white-space: nowrap;
+      margin-left: 3mm;
     }
     .exp-subtitle {
       font-size: 9pt;
@@ -165,8 +168,9 @@ export function generateResumeHTML(resumeData) {
         <div class="section-title">${sec.title}</div>
         ${sec.items ? sec.items.map(item => `
           <div class="exp-item">
-            ${item.title ? `<div class="exp-header">
-              <span class="exp-title">${item.title}</span>
+            ${item.title || item.date ? `
+            <div class="exp-header">
+              ${item.title ? `<span class="exp-title">${item.title}</span>` : ''}
               ${item.date ? `<span class="exp-date">${item.date}</span>` : ''}
             </div>` : ''}
             ${item.subtitle ? `<div class="exp-subtitle">${item.subtitle}</div>` : ''}
@@ -189,7 +193,7 @@ export function generateResumeHTML(resumeData) {
 </html>`;
 }
 
-// 解析简历文本为结构化数据 — v5 彻底修复版
+// 解析简历文本为结构化数据 — v6 修复日期重复BUG
 export function parseResumeToStructured(text, targetJobName = '') {
   if (!text || !text.trim()) {
     return { name: '姓名', title: targetJobName || '求职意向', contact: [], sections: [] };
@@ -197,25 +201,26 @@ export function parseResumeToStructured(text, targetJobName = '') {
   
   const lines = text.split('\n').map(l => l.trim()).filter(l => l);
   
-  // 提取姓名（第一行，长度适中，不是特殊标记行）
+  // ====== 提取姓名 ======
   let name = '';
   for (const line of lines.slice(0, 10)) {
     if (line.length >= 2 && line.length <= 12 && 
         !line.includes('求职') && !line.includes('意向') && 
         !line.includes('电话') && !line.includes('邮箱') &&
         !line.includes('：') && !line.includes(':') &&
-        !line.startsWith('【') && !line.startsWith('[')) {
+        !line.startsWith('【') && !line.startsWith('[') &&
+        !line.match(/\d{4}/)) {  // 排除包含年份的行
       name = line;
       break;
     }
   }
   if (!name) name = lines[0] || '姓名';
   
-  // 提取联系方式
+  // ====== 提取联系方式（只在前15行查找，避免提取到经历中的日期）======
   const contact = [];
   const seenTypes = new Set();
   
-  for (const line of lines) {
+  for (const line of lines.slice(0, 15)) {
     // 电话
     const phoneMatch = line.match(/(\d{3}[-\s]?\d{4}[-\s]?\d{4}|\d{11})/);
     if (phoneMatch && !seenTypes.has('phone') && line.length < 50) {
@@ -246,7 +251,7 @@ export function parseResumeToStructured(text, targetJobName = '') {
     }
     // 出生年月
     const birthMatch = line.match(/(\d{4}[年.\-/]\d{1,2})/);
-    if (birthMatch && !seenTypes.has('birth') && line.length < 30) {
+    if (birthMatch && !seenTypes.has('birth') && line.length < 30 && line.includes('出生')) {
       contact.push({ value: birthMatch[0], type: 'birth' });
       seenTypes.add('birth');
     }
@@ -256,10 +261,9 @@ export function parseResumeToStructured(text, targetJobName = '') {
   const order = ['phone', 'email', 'birth', 'political', 'address'];
   contact.sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
   
-  // ====== 核心：模块解析（彻底修复版）======
+  // ====== 模块解析 ======
   const sections = [];
   
-  // 定义模块关键词映射
   const sectionMap = {
     '教育背景': { title: '🎓 教育背景', type: 'education' },
     '教育经历': { title: '🎓 教育背景', type: 'education' },
@@ -285,7 +289,6 @@ export function parseResumeToStructured(text, targetJobName = '') {
     '个人总结': { title: '📝 自我评价', type: 'evaluation' }
   };
   
-  // 检测是否是模块标题行
   function detectSection(line) {
     for (const [keyword, config] of Object.entries(sectionMap)) {
       if (line.includes(keyword) && line.length < 25) {
@@ -293,14 +296,6 @@ export function parseResumeToStructured(text, targetJobName = '') {
       }
     }
     return null;
-  }
-  
-  // 检测是否是新条目标题（有编号或时间）
-  function isNewItem(line) {
-    return /^\d+[.．、\s]/.test(line) || 
-           /^\d{4}[.\-/]\d{1,2}/.test(line) ||
-           (line.includes('：') && line.length < 40) ||
-           (line.includes(':') && line.length < 40);
   }
   
   // 第一阶段：收集所有模块及其原始行
@@ -312,11 +307,9 @@ export function parseResumeToStructured(text, targetJobName = '') {
     const secConfig = detectSection(line);
     
     if (secConfig) {
-      // 保存上一个模块
       if (currentRaw) {
         rawSections.push(currentRaw);
       }
-      // 创建新模块
       currentRaw = {
         title: secConfig.title,
         type: secConfig.type,
@@ -325,24 +318,20 @@ export function parseResumeToStructured(text, targetJobName = '') {
       continue;
     }
     
-    // 跳过空行和极短行
     if (line.length < 2) continue;
-    
     // 跳过联系方式行（避免混入）
-    if (line.includes('@') || /\d{11}/.test(line)) continue;
+    if (line.includes('@') || (/\d{11}/.test(line) && line.length < 30)) continue;
     
-    // 添加到当前模块
     if (currentRaw) {
       currentRaw.lines.push(line);
     }
   }
   
-  // 保存最后一个模块
   if (currentRaw) {
     rawSections.push(currentRaw);
   }
   
-  // 第二阶段：将每个模块的原始行解析为结构化条目
+  // 第二阶段：解析每个模块
   for (const raw of rawSections) {
     const section = {
       title: raw.title,
@@ -351,15 +340,13 @@ export function parseResumeToStructured(text, targetJobName = '') {
     };
     
     if (raw.type === 'skills') {
-      // 技能模块：整段作为技能描述，不按逗号切分
+      // 技能模块：整段保留
       section.skillTags = [];
       const allText = raw.lines.join(' ');
-      // 只按明显的分隔符切分，且过滤掉过短的
       const skills = allText.split(/[,，、;；]/).map(s => s.trim()).filter(s => s.length >= 2 && s.length <= 25);
       skills.forEach(s => {
         section.skillTags.push({ name: s });
       });
-      // 如果没有切分出技能，保留整段
       if (section.skillTags.length === 0 && raw.lines.length > 0) {
         section.items.push({
           title: '',
@@ -368,7 +355,7 @@ export function parseResumeToStructured(text, targetJobName = '') {
         });
       }
     } else if (raw.type === 'evaluation') {
-      // 自我评价：合并所有行为一段
+      // 自我评价：合并为一段
       if (raw.lines.length > 0) {
         section.items.push({
           title: '',
@@ -381,7 +368,15 @@ export function parseResumeToStructured(text, targetJobName = '') {
       let currentItem = null;
       
       for (const line of raw.lines) {
-        if (isNewItem(line)) {
+        // 检测是否是新条目标题（有编号或明确分隔）
+        const isNewItem = /^\d+[.．、\s]/.test(line) || 
+                         (line.includes('：') && line.length < 50) ||
+                         (line.includes(':') && line.length < 50);
+        
+        // 检测是否包含日期（如 "2021.9 - 2025.6"）
+        const hasDate = /\d{4}[.\-/]\d{1,2}/.test(line);
+        
+        if (isNewItem || (hasDate && line.length < 60)) {
           // 保存上一个条目
           if (currentItem) {
             section.items.push(currentItem);
@@ -389,18 +384,25 @@ export function parseResumeToStructured(text, targetJobName = '') {
           
           // 解析新条目
           const parts = line.split(/[:：]/, 2);
-          currentItem = {
-            title: parts[0].trim(),
-            subtitle: parts[1] ? parts[1].trim() : '',
-            description: '',
-            date: ''
-          };
+          const titlePart = parts[0].trim();
+          const descPart = parts[1] ? parts[1].trim() : '';
           
-          // 尝试提取日期
-          const dateMatch = line.match(/(\d{4}[.\-/]\d{1,2}[.\-/]?\d{0,2}.*?)(?=[\s]|$)/);
-          if (dateMatch) {
-            currentItem.date = dateMatch[0];
-          }
+          // 从标题中提取日期
+          const dateMatch = titlePart.match(/(\d{4}[.\-/]\d{1,2}[\s~\-–—]+\d{4}[.\-/]\d{1,2}|\d{4}[.\-/]\d{1,2})/);
+          const extractedDate = dateMatch ? dateMatch[0] : '';
+          
+          // 清理标题中的日期
+          let cleanTitle = titlePart.replace(/\d{4}[.\-/]\d{1,2}[\s~\-–—]+\d{4}[.\-/]\d{1,2}/, '')
+                                    .replace(/\d{4}[.\-/]\d{1,2}/, '')
+                                    .replace(/^\d+[.．、\s]+/, '')
+                                    .trim();
+          
+          currentItem = {
+            title: cleanTitle || titlePart,
+            subtitle: descPart,
+            description: '',
+            date: extractedDate
+          };
         } else if (currentItem) {
           // 追加到当前条目的描述
           if (currentItem.description) {
@@ -419,7 +421,6 @@ export function parseResumeToStructured(text, targetJobName = '') {
         }
       }
       
-      // 保存最后一个条目
       if (currentItem) {
         section.items.push(currentItem);
       }
@@ -442,6 +443,11 @@ export function parseResumeToStructured(text, targetJobName = '') {
           .replace(/T[（(]任务[）)][:：]?\s*/g, '')
           .replace(/A[（(]行动[）)][:：]?\s*/g, '')
           .replace(/R[（(]结果[）)][:：]?\s*/g, '');
+      }
+      // 如果title为空但subtitle有内容，把subtitle移到title
+      if (!item.title && item.subtitle) {
+        item.title = item.subtitle;
+        item.subtitle = '';
       }
     });
   });
