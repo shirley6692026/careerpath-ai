@@ -2,6 +2,7 @@ import { useState } from 'react'
 import JDTranslator from './JDTranslator'
 import SkillRadar from './SkillRadar'
 import Interview from './Interview'
+import ResumeWorkshop from './ResumeWorkshop'
 
 function App() {
   const [page, setPage] = useState('home');
@@ -24,6 +25,7 @@ function App() {
               { key: 'jd', label: '📄 JD翻译官' },
               { key: 'skill', label: '🎯 能力雷达' },
               { key: 'interview', label: '🤖 AI面试' },
+              { key: 'resume', label: '📄 简历工坊' },
             ].map(item => (
               <button key={item.key} onClick={() => setPage(item.key)}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -41,6 +43,7 @@ function App() {
         {page === 'jd' && <JDTranslator />}
         {page === 'skill' && <SkillRadar />}
         {page === 'interview' && <Interview />}
+        {page === 'resume' && <ResumeWorkshop />}
       </main>
 
       <footer className="text-center py-6 text-sm text-slate-400">
