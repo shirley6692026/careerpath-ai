@@ -227,16 +227,10 @@ export default function ResumeWorkshop() {
             </div>
             
             {/* 底部按钮 - 固定可见 */}
-            <div className="px-6 py-4 border-t bg-white rounded-b-xl flex gap-4 justify-center shrink-0">
-              <button
-                onClick={() => setShowPreview(false)}
-                className="px-8 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium"
-              >
-                关闭预览
-              </button>
+            <div className="px-6 py-4 border-t bg-white rounded-b-xl flex justify-center shrink-0">
               <button
                 onClick={handleDownloadPDF}
-                className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold text-lg"
+                className="px-10 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold text-lg shadow-md"
               >
                 📥 下载PDF
               </button>
