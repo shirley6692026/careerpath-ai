@@ -1,22 +1,42 @@
 import { useState, useRef } from 'react';
 import { API_BASE } from './services/api';
 
-// Resume Workshop v2 — ASC层核心功能 (升级版)
-// 基于AI+HR研究成果的知识驱动简历优化系统
+// Resume Workshop v3 — 基于用户反馈深度优化
+// 优化点:
+// 1. 支持目标岗位JD输入
+// 2. 简历模块化解析展示
+// 3. 10分制评分
+// 4. 诊断不重复评分
+// 5. 优化后10分制评分 + "AI生成新简历"按钮
+// 6. 对比效果改为"AI生成新简历"
 
 const SECTIONS = [
-  { id: 'upload', label: '📄 上传简历', icon: '📄' },
-  { id: 'score', label: '📊 初评评分', icon: '📊' },
-  { id: 'diagnose', label: '🔍 AI诊断', icon: '🔍' },
-  { id: 'optimize', label: '✨ AI优化', icon: '✨' },
-  { id: 'compare', label: '⚖️ 对比效果', icon: '⚖️' },
+  { id: 'upload', label: '📄 上传简历' },
+  { id: 'score', label: '📊 初评评分' },
+  { id: 'diagnose', label: '🔍 AI诊断' },
+  { id: 'optimize', label: '✨ AI优化' },
+  { id: 'newresume', label: '📝 AI生成新简历' },
 ];
+
+// 模块名称映射
+const MODULE_NAMES = {
+  personal: '👤 个人信息',
+  education: '🎓 教育经历',
+  honors: '🏆 所获荣誉',
+  skills: '💡 专业技能',
+  work: '💼 工作经历',
+  projects: '🚀 项目经验',
+  evaluation: '📝 个人评价',
+  raw: '📄 简历内容'
+};
 
 export default function ResumeWorkshop() {
   const [activeTab, setActiveTab] = useState('upload');
   const [resumeText, setResumeText] = useState('');
   const [parsedInfo, setParsedInfo] = useState(null);
+  const [modules, setModules] = useState(null);
   const [targetJob, setTargetJob] = useState('');
+  const [jobJd, setJobJd] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -51,13 +71,38 @@ export default function ResumeWorkshop() {
       if (data.status === 'success') {
         setResumeText(data.text);
         setParsedInfo(data.parsed);
-        setInitialScore(data.initial_score);
-        setActiveTab('score');
+        setModules(data.modules);
       } else {
         setError(data.error || '上传失败');
       }
     } catch (err) {
       setError('网络错误: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ========== 初评评分 ==========
+  const handleScore = async () => {
+    if (!resumeText) { setError('请先上传简历'); return; }
+    setLoading(true);
+    setError('');
+
+    try {
+      const res = await fetch(`${API_BASE}/api/resume/score`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          resume_text: resumeText, 
+          target_job: targetJob,
+          job_jd: jobJd
+        }),
+      });
+      const data = await res.json();
+      setInitialScore(data);
+      setActiveTab('score');
+    } catch (err) {
+      setError('评分失败: ' + err.message);
     } finally {
       setLoading(false);
     }
@@ -76,6 +121,7 @@ export default function ResumeWorkshop() {
         body: JSON.stringify({ 
           resume_text: resumeText, 
           target_job: targetJob,
+          job_jd: jobJd,
           initial_score: initialScore
         }),
       });
@@ -92,7 +138,6 @@ export default function ResumeWorkshop() {
   // ========== AI优化 ==========
   const handleOptimize = async () => {
     if (!resumeText) { setError('请先上传简历'); return; }
-    if (!targetJob) { setError('请填写目标岗位'); return; }
     setLoading(true);
     setError('');
 
@@ -103,15 +148,16 @@ export default function ResumeWorkshop() {
         body: JSON.stringify({ 
           resume_text: resumeText, 
           target_job: targetJob,
+          job_jd: jobJd,
           diagnosis_result: diagnosisResult,
-          focus: 'general',
+          initial_score: initialScore,
           user_notes: ''
         }),
       });
       const data = await res.json();
       setOptimizeResult(data);
       setNewScore(data.new_score);
-      setActiveTab('compare');
+      setActiveTab('optimize');
     } catch (err) {
       setError('优化失败: ' + err.message);
     } finally {
@@ -134,12 +180,10 @@ export default function ResumeWorkshop() {
       });
       const data = await res.json();
       
-      // 创建新窗口显示HTML
       const printWindow = window.open('', '_blank');
       printWindow.document.write(data.html);
       printWindow.document.close();
       
-      // 自动触发打印
       setTimeout(() => {
         printWindow.print();
       }, 500);
@@ -152,14 +196,8 @@ export default function ResumeWorkshop() {
   return (
     <div className="max-w-5xl mx-auto p-6">
       <div className="mb-8">
-        <h1 className="text-3xl font-bold mb-2">📄 简历工坊 v2</h1>
+        <h1 className="text-3xl font-bold mb-2">📄 简历工坊</h1>
         <p className="text-gray-600">基于AI+HR研究成果的专业简历优化系统</p>
-        <div className="mt-2 flex gap-2 text-sm">
-          <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded">McKinsey 2025</span>
-          <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">Deloitte 2025</span>
-          <span className="bg-green-100 text-green-700 px-2 py-1 rounded">Gartner 2025</span>
-          <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded">WEF 2025</span>
-        </div>
       </div>
 
       {/* 标签页 */}
@@ -179,18 +217,6 @@ export default function ResumeWorkshop() {
         ))}
       </div>
 
-      {/* 目标岗位输入 */}
-      <div className="mb-4 bg-white rounded-lg p-4 shadow-sm border">
-        <label className="block text-sm font-medium text-gray-700 mb-1">🎯 目标岗位（用于精准匹配和优化）</label>
-        <input
-          type="text"
-          value={targetJob}
-          onChange={e => setTargetJob(e.target.value)}
-          placeholder="例如：前端开发工程师、产品经理、数据分析师..."
-          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-        />
-      </div>
-
       {/* 错误提示 */}
       {error && (
         <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
@@ -208,56 +234,80 @@ export default function ResumeWorkshop() {
 
       {/* ========== 上传页面 ========== */}
       {activeTab === 'upload' && (
-        <div className="bg-white rounded-xl shadow-sm border p-8 text-center">
-          <div className="text-6xl mb-4">📄</div>
-          <h3 className="text-lg font-semibold mb-2">上传你的简历</h3>
-          <p className="text-gray-500 mb-2">支持 .docx 格式，AI将自动解析并初评</p>
-          <p className="text-sm text-blue-600 mb-6">基于 McKinsey/Deloitte/Gartner/WEF 2025 研究标准</p>
+        <div className="space-y-6">
+          {/* 上传区域 */}
+          <div className="bg-white rounded-xl shadow-sm border p-8 text-center">
+            <div className="text-6xl mb-4">📄</div>
+            <h3 className="text-lg font-semibold mb-2">上传你的简历</h3>
+            <p className="text-gray-500 mb-6">支持 .docx 格式，AI将自动解析并模块化展示</p>
 
-          <input
-            type="file"
-            ref={fileInputRef}
-            accept=".docx"
-            onChange={handleUpload}
-            className="hidden"
-          />
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
-          >
-            选择简历文件
-          </button>
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".docx"
+              onChange={handleUpload}
+              className="hidden"
+            />
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition"
+            >
+              选择简历文件
+            </button>
+          </div>
 
+          {/* 目标岗位信息 */}
           {resumeText && (
-            <div className="mt-6 text-left">
-              <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg mb-4">
-                ✅ 简历已上传并解析成功！共 {resumeText.length} 字
+            <div className="bg-white rounded-xl shadow-sm border p-6 space-y-4">
+              <h3 className="text-lg font-semibold">🎯 目标岗位信息</h3>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">目标岗位名称</label>
+                <input
+                  type="text"
+                  value={targetJob}
+                  onChange={e => setTargetJob(e.target.value)}
+                  placeholder="例如：前端开发工程师、产品经理..."
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
               </div>
-              <div className="bg-gray-50 rounded-lg p-4 max-h-64 overflow-y-auto">
-                <pre className="text-sm text-gray-700 whitespace-pre-wrap">{resumeText.slice(0, 500)}...</pre>
+              
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">目标岗位JD（岗位要求）</label>
+                <textarea
+                  value={jobJd}
+                  onChange={e => setJobJd(e.target.value)}
+                  placeholder="粘贴目标岗位的职位描述（JD），AI将根据JD精准优化你的简历..."
+                  rows={5}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">💡 填写JD后，AI能更精准地匹配关键词和优化简历</p>
               </div>
-              {parsedInfo && (
-                <div className="mt-4 grid grid-cols-3 gap-4">
-                  <div className="bg-blue-50 rounded-lg p-3 text-center">
-                    <div className="text-blue-600 font-semibold text-xl">{parsedInfo.education?.length || 0}</div>
-                    <div className="text-sm text-gray-600">教育经历</div>
-                  </div>
-                  <div className="bg-purple-50 rounded-lg p-3 text-center">
-                    <div className="text-purple-600 font-semibold text-xl">{parsedInfo.skills?.length || 0}</div>
-                    <div className="text-sm text-gray-600">技能项</div>
-                  </div>
-                  <div className="bg-orange-50 rounded-lg p-3 text-center">
-                    <div className="text-orange-600 font-semibold text-xl">{parsedInfo.experience?.length || 0}</div>
-                    <div className="text-sm text-gray-600">项目/工作经历</div>
-                  </div>
-                </div>
-              )}
+
               <button
-                onClick={() => setActiveTab('score')}
-                className="mt-4 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition"
+                onClick={handleScore}
+                disabled={loading}
+                className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 font-semibold"
               >
-                查看初评评分 →
+                📊 查看初评评分
               </button>
+            </div>
+          )}
+
+          {/* 模块化解析展示 */}
+          {modules && (
+            <div className="bg-white rounded-xl shadow-sm border p-6">
+              <h3 className="text-lg font-semibold mb-4">📋 简历模块化解析</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Object.entries(modules).map(([key, content]) => (
+                  <div key={key} className="bg-gray-50 rounded-lg p-4">
+                    <h4 className="font-medium text-gray-800 mb-2">{MODULE_NAMES[key] || key}</h4>
+                    <pre className="text-sm text-gray-600 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                      {content.slice(0, 300)}{content.length > 300 ? '...' : ''}
+                    </pre>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>
@@ -265,10 +315,10 @@ export default function ResumeWorkshop() {
 
       {/* ========== 初评评分 ========== */}
       {activeTab === 'score' && (
-        <div>
+        <div className="space-y-4">
           {!initialScore?.overall_score ? (
             <div className="text-center py-8">
-              <p className="text-gray-500">请先上传简历获取初评</p>
+              <p className="text-gray-500">请先上传简历并填写目标岗位信息</p>
               <button
                 onClick={() => setActiveTab('upload')}
                 className="mt-2 bg-blue-600 text-white px-4 py-2 rounded-lg"
@@ -277,8 +327,40 @@ export default function ResumeWorkshop() {
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
-              {/* 总分 */}
+            <>
+              {/* 6维度评分 */}
+              <div className="bg-white rounded-xl shadow-sm border p-6">
+                <h3 className="text-lg font-semibold mb-4">📊 六维度评分 (10分制)</h3>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                  {initialScore.six_dimensions && Object.entries(initialScore.six_dimensions).map(([key, value]) => (
+                    <div key={key} className="bg-gray-50 rounded-lg p-4">
+                      <div className="flex justify-between mb-2">
+                        <span className="text-sm font-medium text-gray-700">
+                          {key === 'format' ? '格式规范' :
+                           key === 'content' ? '内容质量' :
+                           key === 'skills' ? '技能匹配' :
+                           key === 'experience' ? '经历描述' :
+                           key === 'potential' ? '发展潜力' :
+                           key === 'ai_literacy' ? 'AI素养' : key}
+                        </span>
+                        <span className="text-sm font-bold">{value.score}/10</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className={`h-2 rounded-full ${
+                            value.score >= 8 ? 'bg-green-500' :
+                            value.score >= 6 ? 'bg-yellow-500' : 'bg-red-500'
+                          }`}
+                          style={{ width: `${value.score * 10}%` }}
+                        />
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">{value.comment}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* 综合评分 */}
               <div className="bg-white rounded-xl shadow-sm border p-6">
                 <div className="flex items-center justify-between">
                   <div>
@@ -286,66 +368,36 @@ export default function ResumeWorkshop() {
                     <p className="text-gray-500">基于AI招聘系统和HR专家标准</p>
                   </div>
                   <div className={`text-5xl font-bold ${
-                    initialScore.overall_score >= 80 ? 'text-green-600' :
-                    initialScore.overall_score >= 60 ? 'text-yellow-600' : 'text-red-600'
+                    initialScore.overall_score >= 8 ? 'text-green-600' :
+                    initialScore.overall_score >= 6 ? 'text-yellow-600' : 'text-red-600'
                   }`}>
                     {initialScore.overall_score}
                   </div>
                 </div>
                 <div className="mt-4 w-full bg-gray-200 rounded-full h-3">
                   <div
-                    className={`h-3 rounded-full transition-all ${
-                      initialScore.overall_score >= 80 ? 'bg-green-500' :
-                      initialScore.overall_score >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                    className={`h-3 rounded-full ${
+                      initialScore.overall_score >= 8 ? 'bg-green-500' :
+                      initialScore.overall_score >= 6 ? 'bg-yellow-500' : 'bg-red-500'
                     }`}
-                    style={{ width: `${initialScore.overall_score}%` }}
+                    style={{ width: `${initialScore.overall_score * 10}%` }}
                   />
                 </div>
-                <div className="mt-2 text-center">
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                    initialScore.overall_score >= 80 ? 'bg-green-100 text-green-700' :
-                    initialScore.overall_score >= 60 ? 'bg-yellow-100 text-yellow-700' :
-                    'bg-red-100 text-red-700'
-                  }`}>
-                    {initialScore.overall_score >= 80 ? '优秀' :
-                     initialScore.overall_score >= 60 ? '合格' : '需改进'}
-                  </span>
-                </div>
-              </div>
-
-              {/* 6维度评分 */}
-              {initialScore.six_dimensions && (
-                <div className="bg-white rounded-xl shadow-sm border p-6">
-                  <h3 className="text-lg font-semibold mb-4">📊 六维度评分</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    {Object.entries(initialScore.six_dimensions).map(([key, value]) => (
-                      <div key={key} className="bg-gray-50 rounded-lg p-4">
-                        <div className="flex justify-between mb-2">
-                          <span className="text-sm font-medium text-gray-700">
-                            {key === 'format' ? '格式规范' :
-                             key === 'content' ? '内容质量' :
-                             key === 'skills' ? '技能匹配' :
-                             key === 'experience' ? '经历描述' :
-                             key === 'potential' ? '发展潜力' :
-                             key === 'ai_literacy' ? 'AI素养' : key}
-                          </span>
-                          <span className="text-sm font-bold">{value.score}/100</span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className={`h-2 rounded-full ${
-                              value.score >= 80 ? 'bg-green-500' :
-                              value.score >= 60 ? 'bg-yellow-500' : 'bg-red-500'
-                            }`}
-                            style={{ width: `${value.score}%` }}
-                          />
-                        </div>
-                        <p className="text-xs text-gray-500 mt-1">{value.comment}</p>
-                      </div>
-                    ))}
+                <div className="mt-2 flex gap-4 text-center">
+                  <div className="flex-1">
+                    <div className="text-sm text-gray-500">ATS评分</div>
+                    <div className="text-xl font-bold">{initialScore.ats_score}</div>
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm text-gray-500">HR评分</div>
+                    <div className="text-xl font-bold">{initialScore.hr_score}</div>
+                  </div>
+                  <div className="flex-1">
+                    <div className="text-sm text-gray-500">匹配度</div>
+                    <div className="text-xl font-bold">{initialScore.match_score}</div>
                   </div>
                 </div>
-              )}
+              </div>
 
               {/* 优先改进项 */}
               {initialScore.improvement_areas?.length > 0 && (
@@ -362,65 +414,62 @@ export default function ResumeWorkshop() {
                 </div>
               )}
 
-              <div className="flex gap-4">
-                <button
-                  onClick={handleDiagnose}
-                  disabled={loading}
-                  className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
-                >
-                  🔍 开始AI深度诊断
-                </button>
-              </div>
-            </div>
+              <button
+                onClick={handleDiagnose}
+                disabled={loading}
+                className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 font-semibold"
+              >
+                🔍 开始AI深度诊断
+              </button>
+            </>
           )}
         </div>
       )}
 
       {/* ========== AI诊断 ========== */}
       {activeTab === 'diagnose' && (
-        <div>
+        <div className="space-y-4">
           {!diagnosisResult ? (
             <div className="text-center py-8">
               <button
                 onClick={handleDiagnose}
                 disabled={!resumeText || loading}
-                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition disabled:opacity-50"
+                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 font-semibold"
               >
                 🔍 开始AI深度诊断
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
-              {/* 诊断分数对比 */}
-              <div className="bg-white rounded-xl shadow-sm border p-6">
-                <h3 className="text-lg font-semibold mb-4">📊 诊断评分</h3>
-                <div className="flex items-center gap-8">
-                  <div className="text-center">
-                    <div className="text-sm text-gray-500">初评</div>
-                    <div className="text-2xl font-bold text-gray-600">{diagnosisResult.initial_score?.overall_score || '?'}</div>
-                  </div>
-                  <div className="text-2xl">→</div>
-                  <div className="text-center">
-                    <div className="text-sm text-gray-500">诊断评分</div>
-                    <div className={`text-2xl font-bold ${
-                      diagnosisResult.overall_score >= 80 ? 'text-green-600' :
-                      diagnosisResult.overall_score >= 60 ? 'text-yellow-600' : 'text-red-600'
-                    }`}>
-                      {diagnosisResult.overall_score}
-                    </div>
-                  </div>
-                  {diagnosisResult.score_change !== 0 && (
+            <>
+              {/* 初评分数展示 (只展示，不重新评分) */}
+              {initialScore && (
+                <div className="bg-white rounded-xl shadow-sm border p-6">
+                  <h3 className="text-lg font-semibold mb-4">📊 初评分数</h3>
+                  <div className="flex items-center gap-8">
                     <div className="text-center">
-                      <div className="text-sm text-gray-500">变化</div>
-                      <div className={`text-xl font-bold ${
-                        diagnosisResult.score_change > 0 ? 'text-green-600' : 'text-red-600'
+                      <div className="text-sm text-gray-500">综合评分</div>
+                      <div className={`text-3xl font-bold ${
+                        initialScore.overall_score >= 8 ? 'text-green-600' :
+                        initialScore.overall_score >= 6 ? 'text-yellow-600' : 'text-red-600'
                       }`}>
-                        {diagnosisResult.score_change > 0 ? '+' : ''}{diagnosisResult.score_change}
+                        {initialScore.overall_score}
                       </div>
                     </div>
-                  )}
+                    <div className="text-center">
+                      <div className="text-sm text-gray-500">ATS</div>
+                      <div className="text-2xl font-bold">{initialScore.ats_score}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm text-gray-500">HR</div>
+                      <div className="text-2xl font-bold">{initialScore.hr_score}</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm text-gray-500">匹配度</div>
+                      <div className="text-2xl font-bold">{initialScore.match_score}</div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* 问题列表 */}
               {diagnosisResult.issues?.length > 0 && (
@@ -492,72 +541,91 @@ export default function ResumeWorkshop() {
               <button
                 onClick={handleOptimize}
                 disabled={loading}
-                className="w-full bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition disabled:opacity-50"
+                className="w-full bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition disabled:opacity-50 font-semibold"
               >
                 ✨ 基于诊断结果进行AI优化
               </button>
-            </div>
+            </>
           )}
         </div>
       )}
 
       {/* ========== AI优化 ========== */}
       {activeTab === 'optimize' && (
-        <div>
+        <div className="space-y-4">
           {!optimizeResult ? (
             <div className="text-center py-8">
               <button
                 onClick={handleOptimize}
-                disabled={!resumeText || !targetJob || loading}
-                className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition disabled:opacity-50"
+                disabled={!resumeText || loading}
+                className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition disabled:opacity-50 font-semibold"
               >
-                ✨ AI优化简历
+                ✨ 基于诊断结果进行AI优化
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <>
               {/* 改动说明 */}
-              <div className="bg-white rounded-xl shadow-sm border p-6">
-                <h3 className="text-lg font-semibold mb-4">📝 改动说明</h3>
-                <div className="space-y-2">
-                  {optimizeResult.changes?.map((c, i) => (
-                    <div key={i} className="flex items-start gap-2">
-                      <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs">{c.type}</span>
-                      <span className="text-gray-700">{c.description}</span>
-                    </div>
-                  ))}
+              {optimizeResult.changes?.length > 0 && (
+                <div className="bg-white rounded-xl shadow-sm border p-6">
+                  <h3 className="text-lg font-semibold mb-4">📝 核心改动说明</h3>
+                  <div className="space-y-2">
+                    {optimizeResult.changes.map((c, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <span className="bg-purple-100 text-purple-700 px-2 py-0.5 rounded text-xs">{c.type}</span>
+                        <span className="text-gray-700">{c.description}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* 优化后简历 */}
               <div className="bg-white rounded-xl shadow-sm border p-6">
                 <h3 className="text-lg font-semibold mb-4">✨ 优化后的简历</h3>
-                <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto">
+                <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto border">
                   <pre className="text-sm text-gray-700 whitespace-pre-wrap">{optimizeResult.optimized_text}</pre>
                 </div>
-                <div className="flex gap-2 mt-4">
-                  <button
-                    onClick={() => navigator.clipboard?.writeText(optimizeResult.optimized_text)}
-                    className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition"
-                  >
-                    📋 复制
-                  </button>
-                  <button
-                    onClick={handleGeneratePDF}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
-                  >
-                    📄 生成PDF
-                  </button>
-                </div>
               </div>
-            </div>
+
+              {/* 优化后评分 */}
+              {newScore && (
+                <div className="bg-white rounded-xl shadow-sm border p-6">
+                  <h3 className="text-lg font-semibold mb-4">📊 优化后评分 (10分制)</h3>
+                  <div className="flex items-center gap-8 mb-4">
+                    <div className="text-center">
+                      <div className="text-sm text-gray-500">优化前</div>
+                      <div className="text-3xl font-bold text-gray-600">{initialScore?.overall_score || '?'}</div>
+                    </div>
+                    <div className="text-2xl">→</div>
+                    <div className="text-center">
+                      <div className="text-sm text-gray-500">优化后</div>
+                      <div className="text-3xl font-bold text-green-600">{newScore.new_overall_score || '?'}</div>
+                    </div>
+                    {newScore.score_change > 0 && (
+                      <div className="text-center">
+                        <div className="text-sm text-gray-500">提升</div>
+                        <div className="text-xl font-bold text-green-600">+{newScore.score_change}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <button
+                onClick={() => setActiveTab('newresume')}
+                className="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition font-semibold text-lg"
+              >
+                📝 AI生成新简历
+              </button>
+            </>
           )}
         </div>
       )}
 
-      {/* ========== 对比效果 ========== */}
-      {activeTab === 'compare' && (
-        <div>
+      {/* ========== AI生成新简历 ========== */}
+      {activeTab === 'newresume' && (
+        <div className="space-y-4">
           {!optimizeResult ? (
             <div className="text-center py-8">
               <p className="text-gray-500">请先完成AI优化</p>
@@ -565,38 +633,32 @@ export default function ResumeWorkshop() {
                 onClick={() => setActiveTab('optimize')}
                 className="mt-2 bg-purple-600 text-white px-4 py-2 rounded-lg"
               >
-                去优化
+                去优化简历
               </button>
             </div>
           ) : (
-            <div className="space-y-4">
+            <>
               {/* 分数对比 */}
               {newScore && (
                 <div className="bg-white rounded-xl shadow-sm border p-6">
                   <h3 className="text-lg font-semibold mb-4">⚖️ 优化前后对比</h3>
-                  <div className="grid grid-cols-2 gap-8">
+                  <div className="grid grid-cols-2 gap-8 mb-6">
                     <div className="text-center p-4 bg-gray-50 rounded-lg">
                       <div className="text-sm text-gray-500 mb-2">优化前</div>
-                      <div className="text-3xl font-bold text-gray-600">
-                        {diagnosisResult?.initial_score?.overall_score || initialScore?.overall_score || '?'}
-                      </div>
+                      <div className="text-4xl font-bold text-gray-600">{initialScore?.overall_score || '?'}</div>
                     </div>
                     <div className="text-center p-4 bg-green-50 rounded-lg">
                       <div className="text-sm text-gray-500 mb-2">优化后</div>
-                      <div className="text-3xl font-bold text-green-600">
-                        {newScore.new_overall_score || '?'}
-                      </div>
+                      <div className="text-4xl font-bold text-green-600">{newScore.new_overall_score || '?'}</div>
                       {newScore.score_change > 0 && (
-                        <div className="text-sm text-green-600 mt-1">
-                          +{newScore.score_change} 分 ↑
-                        </div>
+                        <div className="text-sm text-green-600 mt-1">+{newScore.score_change} 分 ↑</div>
                       )}
                     </div>
                   </div>
 
                   {/* 6维度对比 */}
                   {newScore.six_dimensions && (
-                    <div className="mt-6">
+                    <div>
                       <h4 className="font-semibold mb-3">六维度提升</h4>
                       <div className="space-y-3">
                         {Object.entries(newScore.six_dimensions).map(([key, value]) => (
@@ -612,16 +674,13 @@ export default function ResumeWorkshop() {
                             <div className="flex-1 flex items-center gap-2">
                               <span className="text-sm text-gray-500 w-8">{value.old}</span>
                               <div className="flex-1 h-2 bg-gray-200 rounded-full">
-                                <div className="h-2 bg-gray-400 rounded-full" style={{ width: `${value.old}%` }} />
+                                <div className="h-2 bg-gray-400 rounded-full" style={{ width: `${value.old * 10}%` }} />
                               </div>
                               <span className="text-lg">→</span>
                               <div className="flex-1 h-2 bg-gray-200 rounded-full">
-                                <div className="h-2 bg-green-500 rounded-full" style={{ width: `${value.new}%` }} />
+                                <div className="h-2 bg-green-500 rounded-full" style={{ width: `${value.new * 10}%` }} />
                               </div>
                               <span className="text-sm font-bold text-green-600 w-8">{value.new}</span>
-                              {value.change > 0 && (
-                                <span className="text-xs text-green-600">+{value.change}</span>
-                              )}
                             </div>
                           </div>
                         ))}
@@ -631,28 +690,21 @@ export default function ResumeWorkshop() {
                 </div>
               )}
 
-              {/* 优化后简历预览 */}
+              {/* 新简历预览 */}
               <div className="bg-white rounded-xl shadow-sm border p-6">
-                <h3 className="text-lg font-semibold mb-4">📄 优化后简历预览</h3>
+                <h3 className="text-lg font-semibold mb-4">📝 新简历预览</h3>
                 <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto border">
                   <pre className="text-sm text-gray-700 whitespace-pre-wrap">{optimizeResult.optimized_text}</pre>
                 </div>
-                <div className="flex gap-2 mt-4">
-                  <button
-                    onClick={() => navigator.clipboard?.writeText(optimizeResult.optimized_text)}
-                    className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition"
-                  >
-                    📋 复制文本
-                  </button>
-                  <button
-                    onClick={handleGeneratePDF}
-                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition"
-                  >
-                    📄 生成PDF下载
-                  </button>
-                </div>
+                
+                <button
+                  onClick={handleGeneratePDF}
+                  className="mt-4 w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition font-semibold text-lg"
+                >
+                  📄 生成PDF简历
+                </button>
               </div>
-            </div>
+            </>
           )}
         </div>
       )}
