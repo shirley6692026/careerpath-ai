@@ -217,7 +217,7 @@ export function generateResumeHTML(resumeData) {
     
     <!-- 页脚名言 -->
     <div class="footer-quote">
-      "Stay hungry, stay foolish." — 愿你以梦为马，不负韶华，在职业道路上持续精进。
+      "Stay hungry, stay foolish." — 以梦为马，不负韶华，在职业道路上持续精进！
     </div>
   </div>
 </body>
