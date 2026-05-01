@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react';
 import { API_BASE } from './services/api';
+import { generateResumeHTML, parseResumeToStructured } from './ResumePDFTemplate';
+import html2pdf from 'html2pdf.js';
 
 // Resume Workshop v3 — 基于用户反馈深度优化
 // 优化点:
@@ -170,23 +172,29 @@ export default function ResumeWorkshop() {
     if (!optimizeResult?.optimized_text) { setError('请先优化简历'); return; }
     
     try {
-      const res = await fetch(`${API_BASE}/api/resume/generate-pdf`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          resume_text: optimizeResult.optimized_text,
-          title: `${targetJob || '优化'}简历`
-        }),
-      });
-      const data = await res.json();
+      // 使用结构化数据生成美观PDF
+      const resumeData = parseResumeToStructured(optimizeResult.optimized_text);
+      resumeData.score = newScore?.new_overall_score || initialScore?.overall_score;
       
-      const printWindow = window.open('', '_blank');
-      printWindow.document.write(data.html);
-      printWindow.document.close();
+      const html = generateResumeHTML(resumeData);
       
-      setTimeout(() => {
-        printWindow.print();
-      }, 500);
+      // 创建临时容器
+      const element = document.createElement('div');
+      element.innerHTML = html;
+      document.body.appendChild(element);
+      
+      // 使用html2pdf生成PDF
+      const opt = {
+        margin: 0,
+        filename: `${targetJob || '优化'}简历.pdf`,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, useCORS: true },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      };
+      
+      await html2pdf().set(opt).from(element).save();
+      
+      document.body.removeChild(element);
     } catch (err) {
       setError('PDF生成失败: ' + err.message);
     }
