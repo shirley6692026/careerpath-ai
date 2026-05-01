@@ -12,6 +12,17 @@ import json
 from resume_parser import extract_text_from_docx, extract_resume_info
 from ark_client import client
 
+def ark_call(messages, temp=0.3, max_tokens=4096, retries=2):
+    """调用ARK大模型的统一封装"""
+    for _ in range(retries):
+        try:
+            r = client.chat(messages, temperature=temp, max_tokens=max_tokens)
+            if r.get('success'):
+                return r
+        except Exception as e:
+            print(f'ARK call error: {e}')
+    return {'success': False, 'error': 'All retries failed'}
+
 router = APIRouter(prefix="/api/resume", tags=["简历工坊"])
 
 UPLOAD_DIR = Path("uploads")
@@ -171,14 +182,10 @@ async def diagnose_resume(request: ResumeDiagnosisRequest):
     )
     
     try:
-        response = client.chat.completions.create(
-            model="doubao-1.5-pro-32k-250115",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
-            max_tokens=4000
-        )
-        
-        content = response.choices[0].message.content
+        r = ark_call([{'role': 'user', 'content': prompt}], temp=0.3, max_tokens=4000)
+        if not r.get('success'):
+            raise Exception(r.get('error', 'ARK call failed'))
+        content = r['data']
         # 提取JSON
         json_str = content[content.find('{'):content.rfind('}')+1]
         result = json.loads(json_str)
@@ -204,14 +211,10 @@ async def optimize_resume(request: ResumeOptimizeRequest):
     )
     
     try:
-        response = client.chat.completions.create(
-            model="doubao-1.5-pro-32k-250115",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.5,
-            max_tokens=6000
-        )
-        
-        content = response.choices[0].message.content
+        r = ark_call([{'role': 'user', 'content': prompt}], temp=0.5, max_tokens=6000)
+        if not r.get('success'):
+            raise Exception(r.get('error', 'ARK call failed'))
+        content = r['data']
         
         # 分离优化后文本和改动说明
         if "[改动说明]" in content:
@@ -252,14 +255,10 @@ async def score_resume(request: ResumeScoreRequest):
     )
     
     try:
-        response = client.chat.completions.create(
-            model="doubao-1.5-pro-32k-250115",
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.3,
-            max_tokens=4000
-        )
-        
-        content = response.choices[0].message.content
+        r = ark_call([{'role': 'user', 'content': prompt}], temp=0.3, max_tokens=4000)
+        if not r.get('success'):
+            raise Exception(r.get('error', 'ARK call failed'))
+        content = r['data']
         json_str = content[content.find('{'):content.rfind('}')+1]
         result = json.loads(json_str)
         
