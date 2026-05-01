@@ -387,15 +387,16 @@ export function parseResumeToStructured(text, targetJobName = '') {
           const titlePart = parts[0].trim();
           const descPart = parts[1] ? parts[1].trim() : '';
           
-          // 从标题中提取日期
-          const dateMatch = titlePart.match(/(\d{4}[.\-/]\d{1,2}[\s~\-–—]+\d{4}[.\-/]\d{1,2}|\d{4}[.\-/]\d{1,2})/);
+          // 从标题中提取日期（支持 2023.07.10 或 2023.07 格式）
+          const dateMatch = titlePart.match(/(\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?[\s~\-–—]+\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?|\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?)/);
           const extractedDate = dateMatch ? dateMatch[0] : '';
           
-          // 清理标题中的日期
-          let cleanTitle = titlePart.replace(/\d{4}[.\-/]\d{1,2}[\s~\-–—]+\d{4}[.\-/]\d{1,2}/, '')
-                                    .replace(/\d{4}[.\-/]\d{1,2}/, '')
-                                    .replace(/^\d+[.．、\s]+/, '')
-                                    .trim();
+          // 清理标题中的日期（必须匹配完整日期，包括可选的日）
+          let cleanTitle = titlePart
+            .replace(/\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?[\s~\-–—]+\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?/, ' ')
+            .replace(/\b\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?\b/, ' ')
+            .replace(/^\d+[.．、\s]+/, '')
+            .trim();
           
           currentItem = {
             title: cleanTitle || titlePart,
