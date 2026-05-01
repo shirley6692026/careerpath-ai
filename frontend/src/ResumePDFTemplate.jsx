@@ -1,4 +1,4 @@
-// 专业简历PDF模板 v8 — 毕业设计/校园履历/实习经历描述不加粗
+// 专业简历PDF模板 v9 — 修复实习经历日期位置
 
 export function generateResumeHTML(resumeData) {
   const { name, title, contact, sections, targetJob } = resumeData;
@@ -201,7 +201,7 @@ export function generateResumeHTML(resumeData) {
 </html>`;
 }
 
-// 解析简历文本为结构化数据 — v8 修复特定模块不加粗
+// 解析简历文本为结构化数据 — v9 修复实习经历日期位置
 export function parseResumeToStructured(text, targetJobName = '') {
   if (!text || !text.trim()) {
     return { name: '姓名', title: targetJobName || '求职意向', contact: [], sections: [] };
@@ -341,7 +341,6 @@ export function parseResumeToStructured(text, targetJobName = '') {
     };
     
     if (raw.type === 'skills') {
-      // 技能模块：整段保留，不切分
       section.skillTags = [];
       const allText = raw.lines.join(' ');
       const skills = allText.split(/[,，、;；]/).map(s => s.trim()).filter(s => s.length >= 2 && s.length <= 25);
@@ -358,7 +357,6 @@ export function parseResumeToStructured(text, targetJobName = '') {
         });
       }
     } else if (raw.type === 'evaluation') {
-      // 自我评价：合并为一段
       if (raw.lines.length > 0) {
         section.items.push({
           title: '',
@@ -367,7 +365,6 @@ export function parseResumeToStructured(text, targetJobName = '') {
         });
       }
     } else if (raw.type === 'graduation' || raw.type === 'campus') {
-      // 毕业设计、校园履历：整段作为description，不加粗
       if (raw.lines.length > 0) {
         section.items.push({
           title: '',
@@ -377,69 +374,53 @@ export function parseResumeToStructured(text, targetJobName = '') {
         });
       }
     } else if (raw.type === 'work') {
-      // 实习经历：提取日期，描述不加粗
-      let currentItem = null;
-      
+      // 实习经历：每行独立处理，提取日期到头部
       for (const line of raw.lines) {
-        // 检测日期前缀
-        const dateMatch = line.match(/^(\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?[\s~\-–—]+\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?)[,，\s]+(.+)/);
-        const numberDateMatch = line.match(/^(\d+[.．、\s]+)(\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?[\s~\-–—]+\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?)[,，\s]+(.+)/);
+        // 尝试提取日期（多种格式）
+        // 格式1: "2023.07.10 - 2023.08.23，在相关车企..."
+        // 格式2: "1. 2023.07.10 - 2023.08.23，在相关车企..."
+        // 格式3: "2023.07-2023.08 在相关车企..."
         
-        let extractedDate = '';
-        let restText = '';
-        let isNewItem = false;
+        let date = '';
+        let rest = line;
         
+        // 先移除开头的编号
+        const numberPrefix = line.match(/^(\d+[.．、\s]+)/);
+        if (numberPrefix) {
+          rest = line.substring(numberPrefix[0].length);
+        }
+        
+        // 提取日期（支持 2023.07.10 - 2023.08.23 或 2023.07-2023.08）
+        const dateMatch = rest.match(/^(\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?[\s~\-–—]+\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?)/);
         if (dateMatch) {
-          isNewItem = true;
-          extractedDate = dateMatch[1];
-          restText = dateMatch[2];
-        } else if (numberDateMatch) {
-          isNewItem = true;
-          extractedDate = numberDateMatch[2];
-          restText = numberDateMatch[3];
+          date = dateMatch[1];
+          rest = rest.substring(date.length).replace(/^[,，\s]+/, '');
         }
         
-        if (isNewItem) {
-          if (currentItem) {
-            section.items.push(currentItem);
-          }
-          
-          // 分割第一句和剩余描述
-          const firstSentenceMatch = restText.match(/^([^。！]+[。！]?)/);
-          const firstSentence = firstSentenceMatch ? firstSentenceMatch[1] : restText;
-          const remaining = restText.substring(firstSentence.length).replace(/^[。！\s]+/, '');
-          
-          currentItem = {
-            title: firstSentence.replace(/[。！]$/, '').trim(),
-            subtitle: '',
-            description: remaining,
-            date: extractedDate,
-            titleBold: false  // 不加粗
-          };
-        } else if (currentItem) {
-          // 追加到当前条目的描述
-          if (currentItem.description) {
-            currentItem.description += ' ' + line;
-          } else {
-            currentItem.description = line;
-          }
+        // 分割标题和描述（以第一个句号、逗号、分号或感叹号）
+        let title = '';
+        let description = '';
+        
+        // 找第一个句子结束标记
+        const sentenceEnd = rest.search(/[。！；;]/);
+        if (sentenceEnd > 0) {
+          title = rest.substring(0, sentenceEnd).trim();
+          description = rest.substring(sentenceEnd + 1).replace(/^[。！；;\s]+/, '').trim();
         } else {
-          // 没有当前条目，创建一个新条目（无日期）
-          currentItem = {
-            title: '',
-            subtitle: '',
-            description: line,
-            date: '',
-            titleBold: false
-          };
+          // 没有句子结束标记，整句作为标题
+          title = rest.trim();
         }
-      }
-      
-      if (currentItem) {
-        section.items.push(currentItem);
+        
+        section.items.push({
+          title: title,
+          subtitle: '',
+          description: description,
+          date: date,
+          titleBold: false
+        });
       }
     } else {
-      // 其他模块（教育背景、荣誉等）：按条目解析，标题加粗
+      // 其他模块（教育背景、荣誉等）
       let currentItem = null;
       
       for (const line of raw.lines) {
@@ -478,7 +459,7 @@ export function parseResumeToStructured(text, targetJobName = '') {
             subtitle: '',
             description: itemDesc,
             date: extractedDate,
-            titleBold: true  // 加粗
+            titleBold: true
           };
         } else if (currentItem) {
           if (currentItem.description) {
