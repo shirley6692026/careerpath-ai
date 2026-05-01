@@ -166,8 +166,9 @@ export default function ResumeWorkshop() {
     if (!optimizeResult?.optimized_text) { setError('请先优化简历'); return; }
     
     try {
-      const resumeData = parseResumeToStructured(optimizeResult.optimized_text);
+      const resumeData = parseResumeToStructured(optimizeResult.optimized_text, targetJob);
       resumeData.score = newScore?.new_overall_score || initialScore?.overall_score;
+      resumeData.targetJob = targetJob;
       
       const html = generateResumeHTML(resumeData);
       setPreviewHtml(html);
@@ -202,35 +203,37 @@ export default function ResumeWorkshop() {
     <div className="max-w-5xl mx-auto p-6">
       {/* 预览弹窗 */}
       {showPreview && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-4xl w-full max-h-[90vh] flex flex-col">
-            <div className="flex justify-between items-center p-4 border-b">
+        <div className="fixed inset-0 bg-black/50 z-50 flex flex-col">
+          <div className="bg-white shadow-2xl flex-1 flex flex-col max-w-4xl mx-auto w-full">
+            <div className="flex justify-between items-center px-6 py-3 border-b bg-white">
               <h3 className="text-lg font-semibold">📄 简历预览</h3>
               <button 
                 onClick={() => setShowPreview(false)}
-                className="text-gray-500 hover:text-gray-700 text-xl"
+                className="text-gray-500 hover:text-gray-700 text-xl px-2"
               >
                 ✕
               </button>
             </div>
-            <div className="flex-1 overflow-auto p-4 bg-gray-100">
+            
+            <div className="flex-1 overflow-auto p-6 bg-gray-100">
               <div 
                 ref={previewRef}
                 dangerouslySetInnerHTML={{ __html: previewHtml }}
-                className="mx-auto"
-                style={{ width: '210mm' }}
+                className="mx-auto shadow-lg"
+                style={{ width: '210mm', minHeight: '297mm' }}
               />
             </div>
-            <div className="p-4 border-t flex gap-3 justify-center">
+            
+            <div className="px-6 py-4 border-t bg-white flex gap-4 justify-center">
               <button
                 onClick={() => setShowPreview(false)}
-                className="px-6 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition"
+                className="px-8 py-3 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition font-medium"
               >
                 关闭预览
               </button>
               <button
                 onClick={handleDownloadPDF}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold"
+                className="px-8 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-semibold text-lg"
               >
                 📥 下载PDF
               </button>
