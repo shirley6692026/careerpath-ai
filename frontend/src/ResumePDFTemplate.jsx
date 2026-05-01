@@ -1,4 +1,4 @@
-// 专业简历PDF模板 v6 — 修复日期重复和位置错误BUG
+// 专业简历PDF模板 v7 — 修复日期位置和标题加粗
 
 export function generateResumeHTML(resumeData) {
   const { name, title, contact, sections, targetJob } = resumeData;
@@ -193,7 +193,7 @@ export function generateResumeHTML(resumeData) {
 </html>`;
 }
 
-// 解析简历文本为结构化数据 — v6 修复日期重复BUG
+// 解析简历文本为结构化数据 — v7 修复日期位置和标题加粗
 export function parseResumeToStructured(text, targetJobName = '') {
   if (!text || !text.trim()) {
     return { name: '姓名', title: targetJobName || '求职意向', contact: [], sections: [] };
@@ -209,31 +209,28 @@ export function parseResumeToStructured(text, targetJobName = '') {
         !line.includes('电话') && !line.includes('邮箱') &&
         !line.includes('：') && !line.includes(':') &&
         !line.startsWith('【') && !line.startsWith('[') &&
-        !line.match(/\d{4}/)) {  // 排除包含年份的行
+        !line.match(/^\d{4}/)) {
       name = line;
       break;
     }
   }
   if (!name) name = lines[0] || '姓名';
   
-  // ====== 提取联系方式（只在前15行查找，避免提取到经历中的日期）======
+  // ====== 提取联系方式（只在前15行查找）======
   const contact = [];
   const seenTypes = new Set();
   
   for (const line of lines.slice(0, 15)) {
-    // 电话
     const phoneMatch = line.match(/(\d{3}[-\s]?\d{4}[-\s]?\d{4}|\d{11})/);
     if (phoneMatch && !seenTypes.has('phone') && line.length < 50) {
       contact.push({ value: phoneMatch[0], type: 'phone' });
       seenTypes.add('phone');
     }
-    // 邮箱
     const emailMatch = line.match(/[\w.-]+@[\w.-]+\.\w+/);
     if (emailMatch && !seenTypes.has('email')) {
       contact.push({ value: emailMatch[0], type: 'email' });
       seenTypes.add('email');
     }
-    // 地址/籍贯
     if ((line.includes('地址') || line.includes('籍贯')) && !seenTypes.has('address') && line.length < 50) {
       const addr = line.replace(/.*[:：]/, '').trim();
       if (addr && addr.length > 2) {
@@ -241,7 +238,6 @@ export function parseResumeToStructured(text, targetJobName = '') {
         seenTypes.add('address');
       }
     }
-    // 政治面貌
     if ((line.includes('党员') || line.includes('团员')) && line.length < 20 && !seenTypes.has('political')) {
       const political = line.match(/(中共党员|中共预备党员|共青团员|群众)/)?.[0];
       if (political) {
@@ -249,7 +245,6 @@ export function parseResumeToStructured(text, targetJobName = '') {
         seenTypes.add('political');
       }
     }
-    // 出生年月
     const birthMatch = line.match(/(\d{4}[年.\-/]\d{1,2})/);
     if (birthMatch && !seenTypes.has('birth') && line.length < 30 && line.includes('出生')) {
       contact.push({ value: birthMatch[0], type: 'birth' });
@@ -257,7 +252,6 @@ export function parseResumeToStructured(text, targetJobName = '') {
     }
   }
   
-  // 按类型排序
   const order = ['phone', 'email', 'birth', 'political', 'address'];
   contact.sort((a, b) => order.indexOf(a.type) - order.indexOf(b.type));
   
@@ -298,7 +292,7 @@ export function parseResumeToStructured(text, targetJobName = '') {
     return null;
   }
   
-  // 第一阶段：收集所有模块及其原始行
+  // 收集所有模块及其原始行
   const rawSections = [];
   let currentRaw = null;
   
@@ -319,7 +313,6 @@ export function parseResumeToStructured(text, targetJobName = '') {
     }
     
     if (line.length < 2) continue;
-    // 跳过联系方式行（避免混入）
     if (line.includes('@') || (/\d{11}/.test(line) && line.length < 30)) continue;
     
     if (currentRaw) {
@@ -331,7 +324,7 @@ export function parseResumeToStructured(text, targetJobName = '') {
     rawSections.push(currentRaw);
   }
   
-  // 第二阶段：解析每个模块
+  // 解析每个模块
   for (const raw of rawSections) {
     const section = {
       title: raw.title,
@@ -340,12 +333,15 @@ export function parseResumeToStructured(text, targetJobName = '') {
     };
     
     if (raw.type === 'skills') {
-      // 技能模块：整段保留
+      // 技能模块：整段保留，不切分
       section.skillTags = [];
       const allText = raw.lines.join(' ');
+      // 只提取有意义的技能词（长度2-25）
       const skills = allText.split(/[,，、;；]/).map(s => s.trim()).filter(s => s.length >= 2 && s.length <= 25);
       skills.forEach(s => {
-        section.skillTags.push({ name: s });
+        if (!section.skillTags.find(tag => tag.name === s)) {
+          section.skillTags.push({ name: s });
+        }
       });
       if (section.skillTags.length === 0 && raw.lines.length > 0) {
         section.items.push({
@@ -368,40 +364,50 @@ export function parseResumeToStructured(text, targetJobName = '') {
       let currentItem = null;
       
       for (const line of raw.lines) {
-        // 检测是否是新条目标题（有编号或明确分隔）
-        const isNewItem = /^\d+[.．、\s]/.test(line) || 
-                         (line.includes('：') && line.length < 50) ||
-                         (line.includes(':') && line.length < 50);
+        // 检测是否是新条目标题
+        // 模式1: 以日期开头 "2023.07.10 - 2023.08.23，..."
+        // 模式2: 以编号开头 "1. ..."
+        // 模式3: 包含冒号分隔 "标题：描述"
         
-        // 检测是否包含日期（如 "2021.9 - 2025.6"）
-        const hasDate = /\d{4}[.\-/]\d{1,2}/.test(line);
+        const datePrefixMatch = line.match(/^(\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?[\s~\-–—]+\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?)[,，\s]+(.+)/);
+        const numberPrefixMatch = line.match(/^(\d+[.．、\s]+)(.+)/);
+        const colonParts = line.split(/[:：]/, 2);
         
-        if (isNewItem || (hasDate && line.length < 60)) {
+        let isNewItem = false;
+        let extractedDate = '';
+        let itemTitle = '';
+        let itemDesc = '';
+        
+        if (datePrefixMatch) {
+          // 以日期开头
+          isNewItem = true;
+          extractedDate = datePrefixMatch[1];
+          const rest = datePrefixMatch[2];
+          // 从剩余文本中提取标题和描述
+          const restParts = rest.split(/[。！]/, 2);
+          itemTitle = restParts[0].trim();
+          itemDesc = restParts[1] ? restParts[1].trim() : '';
+        } else if (numberPrefixMatch && line.length < 80) {
+          // 以编号开头
+          isNewItem = true;
+          itemTitle = numberPrefixMatch[2].trim();
+        } else if (colonParts.length === 2 && colonParts[0].length < 40) {
+          // 冒号分隔
+          isNewItem = true;
+          itemTitle = colonParts[0].trim();
+          itemDesc = colonParts[1].trim();
+        }
+        
+        if (isNewItem) {
           // 保存上一个条目
           if (currentItem) {
             section.items.push(currentItem);
           }
           
-          // 解析新条目
-          const parts = line.split(/[:：]/, 2);
-          const titlePart = parts[0].trim();
-          const descPart = parts[1] ? parts[1].trim() : '';
-          
-          // 从标题中提取日期（支持 2023.07.10 或 2023.07 格式）
-          const dateMatch = titlePart.match(/(\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?[\s~\-–—]+\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?|\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?)/);
-          const extractedDate = dateMatch ? dateMatch[0] : '';
-          
-          // 清理标题中的日期（必须匹配完整日期，包括可选的日）
-          let cleanTitle = titlePart
-            .replace(/\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?[\s~\-–—]+\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?/, ' ')
-            .replace(/\b\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?\b/, ' ')
-            .replace(/^\d+[.．、\s]+/, '')
-            .trim();
-          
           currentItem = {
-            title: cleanTitle || titlePart,
-            subtitle: descPart,
-            description: '',
+            title: itemTitle,
+            subtitle: '',
+            description: itemDesc,
             date: extractedDate
           };
         } else if (currentItem) {
@@ -430,7 +436,7 @@ export function parseResumeToStructured(text, targetJobName = '') {
     sections.push(section);
   }
   
-  // 第三阶段：清理数据
+  // 清理数据
   sections.forEach(sec => {
     sec.items.forEach(item => {
       // 如果title和description完全相同，清空description
@@ -445,11 +451,13 @@ export function parseResumeToStructured(text, targetJobName = '') {
           .replace(/A[（(]行动[）)][:：]?\s*/g, '')
           .replace(/R[（(]结果[）)][:：]?\s*/g, '');
       }
-      // 如果title为空但subtitle有内容，把subtitle移到title
+      // 如果title为空但subtitle有内容，交换
       if (!item.title && item.subtitle) {
         item.title = item.subtitle;
         item.subtitle = '';
       }
+      // 清理title中的前导标点
+      item.title = item.title.replace(/^[，,、；;\s]+/, '').trim();
     });
   });
   
