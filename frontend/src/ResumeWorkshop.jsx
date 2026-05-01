@@ -256,6 +256,23 @@ export default function ResumeWorkshop() {
             </button>
           </div>
 
+          {/* 模块化解析展示 — 放在目标岗位信息上面 */}
+          {modules && (
+            <div className="bg-white rounded-xl shadow-sm border p-6">
+              <h3 className="text-lg font-semibold mb-4">📋 简历模块化解析</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Object.entries(modules).map(([key, content]) => (
+                  <div key={key} className="bg-gray-50 rounded-lg p-4">
+                    <h4 className="font-medium text-gray-800 mb-2">{MODULE_NAMES[key] || key}</h4>
+                    <pre className="text-sm text-gray-600 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                      {content.slice(0, 300)}{content.length > 300 ? '...' : ''}
+                    </pre>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* 目标岗位信息 */}
           {resumeText && (
             <div className="bg-white rounded-xl shadow-sm border p-6 space-y-4">
@@ -283,32 +300,18 @@ export default function ResumeWorkshop() {
                 />
                 <p className="text-xs text-gray-500 mt-1">💡 填写JD后，AI能更精准地匹配关键词和优化简历</p>
               </div>
-
-              <button
-                onClick={handleScore}
-                disabled={loading}
-                className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 font-semibold"
-              >
-                📊 查看初评评分
-              </button>
             </div>
           )}
 
-          {/* 模块化解析展示 */}
-          {modules && (
-            <div className="bg-white rounded-xl shadow-sm border p-6">
-              <h3 className="text-lg font-semibold mb-4">📋 简历模块化解析</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {Object.entries(modules).map(([key, content]) => (
-                  <div key={key} className="bg-gray-50 rounded-lg p-4">
-                    <h4 className="font-medium text-gray-800 mb-2">{MODULE_NAMES[key] || key}</h4>
-                    <pre className="text-sm text-gray-600 whitespace-pre-wrap max-h-40 overflow-y-auto">
-                      {content.slice(0, 300)}{content.length > 300 ? '...' : ''}
-                    </pre>
-                  </div>
-                ))}
-              </div>
-            </div>
+          {/* 查看初评评分按钮 — 放在最底下 */}
+          {resumeText && (
+            <button
+              onClick={handleScore}
+              disabled={loading}
+              className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition disabled:opacity-50 font-semibold"
+            >
+              📊 查看初评评分
+            </button>
           )}
         </div>
       )}
