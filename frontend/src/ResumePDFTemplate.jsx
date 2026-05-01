@@ -1,4 +1,4 @@
-// 专业简历PDF模板 v7 — 修复日期位置和标题加粗
+// 专业简历PDF模板 v8 — 毕业设计/校园履历/实习经历描述不加粗
 
 export function generateResumeHTML(resumeData) {
   const { name, title, contact, sections, targetJob } = resumeData;
@@ -102,6 +102,12 @@ export function generateResumeHTML(resumeData) {
       color: #1d1d1f;
       flex: 1;
     }
+    .exp-title-normal {
+      font-weight: normal;
+      font-size: 10pt;
+      color: #1d1d1f;
+      flex: 1;
+    }
     .exp-date {
       font-size: 8.5pt;
       color: #86868b;
@@ -170,7 +176,9 @@ export function generateResumeHTML(resumeData) {
           <div class="exp-item">
             ${item.title || item.date ? `
             <div class="exp-header">
-              ${item.title ? `<span class="exp-title">${item.title}</span>` : ''}
+              ${item.title ? `
+                <span class="${item.titleBold === false ? 'exp-title-normal' : 'exp-title'}">${item.title}</span>
+              ` : ''}
               ${item.date ? `<span class="exp-date">${item.date}</span>` : ''}
             </div>` : ''}
             ${item.subtitle ? `<div class="exp-subtitle">${item.subtitle}</div>` : ''}
@@ -193,7 +201,7 @@ export function generateResumeHTML(resumeData) {
 </html>`;
 }
 
-// 解析简历文本为结构化数据 — v7 修复日期位置和标题加粗
+// 解析简历文本为结构化数据 — v8 修复特定模块不加粗
 export function parseResumeToStructured(text, targetJobName = '') {
   if (!text || !text.trim()) {
     return { name: '姓名', title: targetJobName || '求职意向', contact: [], sections: [] };
@@ -336,7 +344,6 @@ export function parseResumeToStructured(text, targetJobName = '') {
       // 技能模块：整段保留，不切分
       section.skillTags = [];
       const allText = raw.lines.join(' ');
-      // 只提取有意义的技能词（长度2-25）
       const skills = allText.split(/[,，、;；]/).map(s => s.trim()).filter(s => s.length >= 2 && s.length <= 25);
       skills.forEach(s => {
         if (!section.skillTags.find(tag => tag.name === s)) {
@@ -359,16 +366,83 @@ export function parseResumeToStructured(text, targetJobName = '') {
           description: raw.lines.join(' ')
         });
       }
-    } else {
-      // 其他模块：按条目解析
+    } else if (raw.type === 'graduation' || raw.type === 'campus') {
+      // 毕业设计、校园履历：整段作为description，不加粗
+      if (raw.lines.length > 0) {
+        section.items.push({
+          title: '',
+          subtitle: '',
+          description: raw.lines.join(' '),
+          titleBold: false
+        });
+      }
+    } else if (raw.type === 'work') {
+      // 实习经历：提取日期，描述不加粗
       let currentItem = null;
       
       for (const line of raw.lines) {
-        // 检测是否是新条目标题
-        // 模式1: 以日期开头 "2023.07.10 - 2023.08.23，..."
-        // 模式2: 以编号开头 "1. ..."
-        // 模式3: 包含冒号分隔 "标题：描述"
+        // 检测日期前缀
+        const dateMatch = line.match(/^(\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?[\s~\-–—]+\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?)[,，\s]+(.+)/);
+        const numberDateMatch = line.match(/^(\d+[.．、\s]+)(\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?[\s~\-–—]+\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?)[,，\s]+(.+)/);
         
+        let extractedDate = '';
+        let restText = '';
+        let isNewItem = false;
+        
+        if (dateMatch) {
+          isNewItem = true;
+          extractedDate = dateMatch[1];
+          restText = dateMatch[2];
+        } else if (numberDateMatch) {
+          isNewItem = true;
+          extractedDate = numberDateMatch[2];
+          restText = numberDateMatch[3];
+        }
+        
+        if (isNewItem) {
+          if (currentItem) {
+            section.items.push(currentItem);
+          }
+          
+          // 分割第一句和剩余描述
+          const firstSentenceMatch = restText.match(/^([^。！]+[。！]?)/);
+          const firstSentence = firstSentenceMatch ? firstSentenceMatch[1] : restText;
+          const remaining = restText.substring(firstSentence.length).replace(/^[。！\s]+/, '');
+          
+          currentItem = {
+            title: firstSentence.replace(/[。！]$/, '').trim(),
+            subtitle: '',
+            description: remaining,
+            date: extractedDate,
+            titleBold: false  // 不加粗
+          };
+        } else if (currentItem) {
+          // 追加到当前条目的描述
+          if (currentItem.description) {
+            currentItem.description += ' ' + line;
+          } else {
+            currentItem.description = line;
+          }
+        } else {
+          // 没有当前条目，创建一个新条目（无日期）
+          currentItem = {
+            title: '',
+            subtitle: '',
+            description: line,
+            date: '',
+            titleBold: false
+          };
+        }
+      }
+      
+      if (currentItem) {
+        section.items.push(currentItem);
+      }
+    } else {
+      // 其他模块（教育背景、荣誉等）：按条目解析，标题加粗
+      let currentItem = null;
+      
+      for (const line of raw.lines) {
         const datePrefixMatch = line.match(/^(\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?[\s~\-–—]+\d{4}[.\-/]\d{1,2}(?:[.\-/]\d{1,2})?)[,，\s]+(.+)/);
         const numberPrefixMatch = line.match(/^(\d+[.．、\s]+)(.+)/);
         const colonParts = line.split(/[:：]/, 2);
@@ -379,27 +453,22 @@ export function parseResumeToStructured(text, targetJobName = '') {
         let itemDesc = '';
         
         if (datePrefixMatch) {
-          // 以日期开头
           isNewItem = true;
           extractedDate = datePrefixMatch[1];
           const rest = datePrefixMatch[2];
-          // 从剩余文本中提取标题和描述
           const restParts = rest.split(/[。！]/, 2);
           itemTitle = restParts[0].trim();
           itemDesc = restParts[1] ? restParts[1].trim() : '';
         } else if (numberPrefixMatch && line.length < 80) {
-          // 以编号开头
           isNewItem = true;
           itemTitle = numberPrefixMatch[2].trim();
         } else if (colonParts.length === 2 && colonParts[0].length < 40) {
-          // 冒号分隔
           isNewItem = true;
           itemTitle = colonParts[0].trim();
           itemDesc = colonParts[1].trim();
         }
         
         if (isNewItem) {
-          // 保存上一个条目
           if (currentItem) {
             section.items.push(currentItem);
           }
@@ -408,22 +477,22 @@ export function parseResumeToStructured(text, targetJobName = '') {
             title: itemTitle,
             subtitle: '',
             description: itemDesc,
-            date: extractedDate
+            date: extractedDate,
+            titleBold: true  // 加粗
           };
         } else if (currentItem) {
-          // 追加到当前条目的描述
           if (currentItem.description) {
             currentItem.description += ' ' + line;
           } else {
             currentItem.description = line;
           }
         } else {
-          // 没有当前条目，创建一个新条目
           currentItem = {
             title: line,
             subtitle: '',
             description: '',
-            date: ''
+            date: '',
+            titleBold: true
           };
         }
       }
@@ -439,11 +508,9 @@ export function parseResumeToStructured(text, targetJobName = '') {
   // 清理数据
   sections.forEach(sec => {
     sec.items.forEach(item => {
-      // 如果title和description完全相同，清空description
       if (item.description === item.title) {
         item.description = '';
       }
-      // 清理机械STAR标记
       if (item.description) {
         item.description = item.description
           .replace(/S[（(]情境[）)][:：]?\s*/g, '')
@@ -451,12 +518,10 @@ export function parseResumeToStructured(text, targetJobName = '') {
           .replace(/A[（(]行动[）)][:：]?\s*/g, '')
           .replace(/R[（(]结果[）)][:：]?\s*/g, '');
       }
-      // 如果title为空但subtitle有内容，交换
       if (!item.title && item.subtitle) {
         item.title = item.subtitle;
         item.subtitle = '';
       }
-      // 清理title中的前导标点
       item.title = item.title.replace(/^[，,、；;\s]+/, '').trim();
     });
   });
