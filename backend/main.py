@@ -14,7 +14,7 @@ import pytesseract
 import cv2, docx
 import numpy as np
 from ark_client import client
-from resume_workshop import router as resume_router
+from resume_workshop_v2 import router as resume_router
 
 app = FastAPI(title="CareerPath AI API", version="3.0.3")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])

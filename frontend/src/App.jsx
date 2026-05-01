@@ -78,6 +78,10 @@ function HomePage({ onNavigate }) {
           className="px-6 py-3 bg-red-600 text-white rounded-xl font-semibold shadow-lg hover:bg-red-700 transition-all">
           🤖 AI 模拟面试
         </button>
+        <button onClick={() => onNavigate('resume')}
+          className="px-6 py-3 bg-green-600 text-white rounded-xl font-semibold shadow-lg hover:bg-green-700 transition-all">
+          📄 简历工坊
+        </button>
       </div>
       <div className="grid grid-cols-3 gap-6 max-w-3xl mx-auto">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
@@ -90,10 +94,11 @@ function HomePage({ onNavigate }) {
           <h3 className="font-semibold text-slate-700">AHP 人力伙伴</h3>
           <p className="text-sm text-slate-400 mt-1">职业导航 · 面试训练</p>
         </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 cursor-pointer hover:shadow-md transition" onClick={() => onNavigate('resume')}>
           <div className="text-3xl mb-3">⚡</div>
           <h3 className="font-semibold text-slate-700">ASC 服务集群</h3>
           <p className="text-sm text-slate-400 mt-1">简历工坊 · 学习路径</p>
+          <div className="mt-2 text-xs text-green-600 font-medium">👆 点击体验简历工坊</div>
         </div>
       </div>
     </div>
