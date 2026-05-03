@@ -1089,12 +1089,7 @@ AI认知力是理解AI能力边界和适用场景的能力。
             🔄 重新评估
           </button>
         </div>
-      </div>
-    );
-  }
-
-  
-      {/* AI教练对话弹窗 */}
+{/* AI教练对话弹窗 */}
       {showCoach && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full h-[600px] flex flex-col">
@@ -1353,5 +1348,11 @@ AI认知力是理解AI能力边界和适用场景的能力。
           </div>
         </div>
       )}
-return null;
+
+      </div>
+    );
+  }
+
+  
+      
 }
