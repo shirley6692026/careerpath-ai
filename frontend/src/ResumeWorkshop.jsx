@@ -10,6 +10,7 @@ const SECTIONS = [
   { id: 'score', label: '📊 初评评分' },
   { id: 'diagnose', label: '🔍 AI诊断' },
   { id: 'optimize', label: '✨ AI优化' },
+  { id: 'edit', label: '✏️ 我要修改' },
   { id: 'newresume', label: '📝 AI生成新简历' },
 ];
 
@@ -40,6 +41,17 @@ export default function ResumeWorkshop() {
   const [diagnosisResult, setDiagnosisResult] = useState(null);
   const [optimizeResult, setOptimizeResult] = useState(null);
   const [newScore, setNewScore] = useState(null);
+  const [editedText, setEditedText] = useState('');
+  const [templateStyle, setTemplateStyle] = useState('blue');
+  const [showStylePicker, setShowStylePicker] = useState(false);
+  const [mergedText, setMergedText] = useState('');
+
+  const TEMPLATE_STYLES = [
+    { id: 'blue', name: '经典蓝白', desc: '蓝色渐变 + 浅蓝标题', primary: '#2B5C9E', secondary: '#7EB8F0' },
+    { id: 'green', name: '清新绿', desc: '绿色渐变 + 浅绿标题', primary: '#2E7D32', secondary: '#A5D6A7' },
+    { id: 'purple', name: '优雅紫', desc: '紫色渐变 + 浅紫标题', primary: '#6A1B9A', secondary: '#CE93D8' },
+    { id: 'dark', name: '商务深色', desc: '深色简洁页头 + 现代风格', primary: '#263238', secondary: '#90A4AE' },
+  ];
 
   const fileInputRef = useRef(null);
   const previewRef = useRef(null); // v3.1: 预览DOM引用
@@ -48,8 +60,9 @@ export default function ResumeWorkshop() {
   const handleUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (!file.name.endsWith('.docx')) {
-      setError('仅支持 .docx 格式');
+    const ext = file.name.split('.').pop().toLowerCase();
+    if (!['docx','pdf','txt','xlsx','doc'].includes(ext)) {
+      setError('仅支持 .docx/.pdf/.txt/.xlsx/.doc 格式');
       return;
     }
 
@@ -161,16 +174,27 @@ export default function ResumeWorkshop() {
     }
   };
 
+  // ========== 进入修改模式 ==========
+  const handleEnterEdit = () => {
+    setEditedText(optimizeResult?.optimized_text || '');
+    setActiveTab('edit');
+  };
+
+  const handleSaveAndContinue = () => {
+    setMergedText(editedText);
+    setActiveTab('newresume');
+  };
+
   // ========== 生成PDF预览 ==========
   const handlePreview = async () => {
     if (!optimizeResult?.optimized_text) { setError('请先优化简历'); return; }
     
     try {
-      const resumeData = parseResumeToStructured(optimizeResult.optimized_text, targetJob);
+      const resumeData = parseResumeToStructured(mergedText || optimizeResult.optimized_text, targetJob);
       resumeData.score = newScore?.new_overall_score || initialScore?.overall_score;
       resumeData.targetJob = targetJob;
       
-      const html = generateResumeHTML(resumeData);
+      const html = generateResumeHTML(resumeData, templateStyle);
       setPreviewHtml(html);
       setShowPreview(true);
     } catch (err) {
@@ -283,12 +307,12 @@ export default function ResumeWorkshop() {
           <div className="bg-white rounded-xl shadow-sm border p-8 text-center">
             <div className="text-6xl mb-4">📄</div>
             <h3 className="text-lg font-semibold mb-2">上传你的简历</h3>
-            <p className="text-gray-500 mb-6">支持 .docx 格式，AI将自动解析并模块化展示</p>
+            <p className="text-gray-500 mb-6">支持 .docx/.pdf/.txt/.xlsx/.doc 格式，AI自动解析</p>
 
             <input
               type="file"
               ref={fileInputRef}
-              accept=".docx"
+              accept=".docx,.pdf,.txt,.xlsx,.doc"
               onChange={handleUpload}
               className="hidden"
             />
@@ -631,7 +655,7 @@ export default function ResumeWorkshop() {
               <div className="bg-white rounded-xl shadow-sm border p-6">
                 <h3 className="text-lg font-semibold mb-4">✨ 优化后的简历</h3>
                 <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto border">
-                  <pre className="text-sm text-gray-700 whitespace-pre-wrap">{optimizeResult.optimized_text}</pre>
+                  <pre className="text-sm text-gray-700 whitespace-pre-wrap">{mergedText || optimizeResult.optimized_text}</pre>
                 </div>
               </div>
 
@@ -660,10 +684,10 @@ export default function ResumeWorkshop() {
               )}
 
               <button
-                onClick={() => setActiveTab('newresume')}
-                className="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition font-semibold text-lg"
+                onClick={handleEnterEdit}
+                className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition font-semibold text-lg"
               >
-                📝 AI生成新简历
+                ✏️ 我要修改微调
               </button>
             </>
           )}
@@ -741,7 +765,7 @@ export default function ResumeWorkshop() {
               <div className="bg-white rounded-xl shadow-sm border p-6">
                 <h3 className="text-lg font-semibold mb-4">📝 新简历预览</h3>
                 <div className="bg-gray-50 rounded-lg p-4 max-h-96 overflow-y-auto border">
-                  <pre className="text-sm text-gray-700 whitespace-pre-wrap">{optimizeResult.optimized_text}</pre>
+                  <pre className="text-sm text-gray-700 whitespace-pre-wrap">{mergedText || optimizeResult.optimized_text}</pre>
                 </div>
                 
                 <button
@@ -755,6 +779,31 @@ export default function ResumeWorkshop() {
           )}
         </div>
       )}
+      <div style={{display: activeTab === 'edit' ? 'block' : 'none'}} className="space-y-6">
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            <h3 className="text-lg font-semibold mb-4">手动修改简历</h3>
+            <textarea className="w-full h-96 p-4 border rounded-lg text-sm font-mono" value={editedText} onChange={e => setEditedText(e.target.value)} />
+          </div>
+          <div className="bg-white rounded-xl shadow-sm border p-6">
+            <h3 className="text-lg font-semibold mb-4">选择简历模版风格</h3>
+            <div className="grid grid-cols-2 gap-4">
+              {TEMPLATE_STYLES.map(style => (
+                <button key={style.id} onClick={() => setTemplateStyle(style.id)} className={'p-4 rounded-xl border-2 text-left transition ' + (templateStyle === style.id ? 'border-blue-500 bg-blue-50 shadow-md' : 'border-gray-200 hover:border-gray-300')}>
+                  <div className="flex items-center gap-3 mb-2">
+                    <div className="w-6 h-6 rounded-lg" style={{ background: style.primary }} />
+                    <span className="font-semibold">{style.name}</span>
+                  </div>
+                  <p className="text-xs text-gray-500">{style.desc}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <button onClick={() => setActiveTab('optimize')} className="flex-1 bg-gray-200 text-gray-700 px-6 py-3 rounded-lg">返回优化</button>
+            <button onClick={handleSaveAndContinue} className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg">使用修改内容生成新简历</button>
+          </div>
+        </div>
+
     </div>
   );
 }

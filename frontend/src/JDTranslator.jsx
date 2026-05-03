@@ -1,4 +1,5 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
+import { useApp } from './context/AppContext';
 import { jdTranslate, jdFromImage } from './services/api';
 
 const SAMPLES = [
@@ -33,6 +34,14 @@ export default function JDTranslator() {
   const [ocrText, setOcrText] = useState('');
   const [showOcr, setShowOcr] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const { state: appState, updateState } = useApp();
+  // 从全局Context预填共享JD
+  useEffect(() => {
+    if (appState.sharedJobJd && !jdText) {
+      setJdText(appState.sharedJobJd);
+    }
+  }, []);
+
 
   const handleTranslate = async () => {
     const textToAnalyze = showOcr ? ocrText : jdText;
@@ -42,6 +51,7 @@ export default function JDTranslator() {
       const res = await jdTranslate(textToAnalyze);
       if (res.success) {
         setResult(res);
+        updateState('jdAnalysis', res);
       } else {
         setError(res.error || '分析失败，请重试');
       }

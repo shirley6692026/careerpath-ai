@@ -3,12 +3,14 @@ import JDTranslator from './JDTranslator'
 import SkillRadar from './SkillRadar'
 import Interview from './Interview'
 import ResumeWorkshop from './ResumeWorkshop'
+import { AppProvider } from './context/AppContext'
 
 function App() {
   const [page, setPage] = useState('home');
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <AppProvider>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       <header className="bg-white/80 backdrop-blur-sm border-b border-slate-200 sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setPage('home')}>
@@ -46,10 +48,11 @@ function App() {
         {page === 'resume' && <ResumeWorkshop />}
       </main>
 
-      <footer className="text-center py-6 text-sm text-slate-400">
-        <p>CareerPath AI v3.0 · 火山引擎 ARK · TRAE SOLO Challenge 2026 · 命题③</p>
-      </footer>
-    </div>
+        <footer className="text-center py-6 text-sm text-slate-400">
+          <p>CareerPath AI v3.0 · 火山引擎 ARK · TRAE SOLO Challenge 2026 · 命题③</p>
+        </footer>
+      </div>
+    </AppProvider>
   );
 }
 

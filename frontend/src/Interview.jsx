@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useApp } from './context/AppContext';
 
 const API_BASE = 'http://localhost:8000';
 const COMPANIES = ['字节跳动', '阿里巴巴', '腾讯', '华为', '比亚迪', '不限'];
@@ -56,6 +57,20 @@ export default function Interview() {
   const [showSummary, setShowSummary] = useState(false);
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
+  const { state: appState, updateState } = useApp();
+  // 从全局Context预填共享信息
+  useEffect(() => {
+    if (appState.sharedTargetJob && !position) {
+      setPosition(appState.sharedTargetJob);
+    }
+    if (appState.resume.text && !resumeText) {
+      setResumeText(appState.resume.text);
+    }
+    if (appState.resume.parsed?.skills?.text && !skills) {
+      setSkills(appState.resume.parsed.skills.text);
+    }
+  }, []);
+
   const [prepData, setPrepData] = useState(null);
   const [showPrep, setShowPrep] = useState(false);
   const [prepLoading, setPrepLoading] = useState(false);

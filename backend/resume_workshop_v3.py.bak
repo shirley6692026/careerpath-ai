@@ -19,7 +19,7 @@ import json
 import re
 from datetime import datetime
 
-from resume_parser import extract_text_from_docx, extract_text_from_pdf, extract_text_from_txt, extract_text_from_xlsx, extract_text_from_doc, extract_resume_info
+from resume_parser import extract_text_from_docx, extract_resume_info
 from ark_client import client
 
 router = APIRouter(prefix="/api/resume", tags=["简历工坊v3"])
@@ -78,7 +78,6 @@ class ResumeOptimizeResult(BaseModel):
     changes: List[dict]
     new_score: dict        # v3: 优化后10分制评分
     score_improvement: dict
-    skill_scores: Optional[dict] = None  # v3.2: 每项技能熟练度评分
 
 # ========== 提示词模板 ==========
 
@@ -201,14 +200,12 @@ OPTIMIZE_PROMPT = """你是一位顶级简历优化师。请基于初评和诊�
 用户额外要求:
 {user_notes}
 
-请输出优化后的完整简历，【严格要求】:
-1. 【重要】必须完整保留个人信息部分（姓名、电话、邮箱、年龄/出生年月、籍贯、政治面貌等）不变
-2. 开头必须有完整的个人信息区域，包括姓名、求职意向、联系方式
-3. 逻辑清晰、专业精准、语言流畅
-4. 无重复啰嗦内容
-5. 【关键】禁止使用任何markdown语法！包括：不加**加粗**、不加*斜体*、不加`代码`、不加>引用、不加```代码块、不画表格|、不画框线┌─┐、不加---分割线、不加#标题标记
-6. 使用纯文本格式，经历描述用自然段落，不要机械STAR
-7. 在文末附上3-5条核心改动说明
+请输出优化后的完整简历，要求:
+1. 逻辑清晰、专业精准、语言流畅
+2. 无重复啰嗦内容
+3. 直接可用的简历格式
+4. 经历描述用自然段落，不要机械STAR
+5. 在文末附上3-5条核心改动说明
 
 格式:
 [优化后简历]
@@ -218,7 +215,7 @@ OPTIMIZE_PROMPT = """你是一位顶级简历优化师。请基于初评和诊�
 1. ...
 2. ..."""
 
-NEW_SCORE_PROMPT = """请对优化后的简历进行10分制评分，同时分析简历中各技能的熟练度（0-10分）。
+NEW_SCORE_PROMPT = """请对优化后的简历进行10分制评分。
 
 原简历评分:
 {old_score}
@@ -243,19 +240,10 @@ NEW_SCORE_PROMPT = """请对优化后的简历进行10分制评分，同时分�
         "potential": {{"old": 0-10的一位小数, "new": 0-10的一位小数, "change": +/-X.X}},
         "ai_literacy": {{"old": 0-10的一位小数, "new": 0-10的一位小数, "change": +/-X.X}}
     }},
-    "skill_scores": {{
-        "Python": 8.5,
-        "JavaScript": 7.0,
-        "React": 6.5,
-        "Docker": 5.0
-    }},
     "improvement_summary": "总体改进总结"
 }}
 
-注意:
-1. 评分严格客观，体现真实改进
-2. skill_scores中提取简历中出现的每个核心技能，根据简历描述评估熟练度
-3. 示例格式仅供参考，请填入真实技能名和分数"""
+注意: 评分严格客观，体现真实改进"""
 
 # ========== 工具函数 ==========
 
@@ -286,114 +274,52 @@ def extract_json_from_text(text: str) -> dict:
 
 def parse_resume_modules(text: str) -> dict:
     """v3: 将简历文本拆分为模块化结构"""
-    result = {}  # renamed from 'modules' to avoid potential shadowing
+    modules = {}
     lines = text.split('\n')
-    cur_sec = None
-    cur_content = []
-    import re
+    current_section = None
+    current_content = []
     
+    # 定义模块关键词映射
     section_keywords = {
-        'personal': ['个人信息', '基本资料', '个人简介', '求职意向', '求职目标', '职业定位', '资源网络'],
-        'education': ['教育背景', '教育经历', '教育培训'],
-        'honors': ['所获荣誉', '荣誉奖项', '获得荣誉', '荣誉证书', '获奖情况', '专业认证', '证书'],
-        'skills': ['专业技能', '技能特长', '职业技能', '核心技能', '技术栈', 'IT技能', '核心能力', '核心优势'],
-        'work': ['工作经历', '工作履历', '实习经历', '工作背景', '主要经历', '工作业绩', '实战经验', '战绩数据'],
-        'projects': ['项目经验', '项目经历', '项目成果', '项目背景', '项目案例', '实战项目'],
-        'evaluation': ['自我评价', '个人评价', '个人总结', '自我总结', '个人优势', '综合描述', '个人特点']
+        'personal': ['个人信息', '基本信息', '个人资料', '姓名', '联系方式', '电话', '邮箱'],
+        'education': ['教育经历', '教育背景', '学历', '学校', '大学', '学院', '专业'],
+        'honors': ['所获荣誉', '荣誉', '奖项', '获奖', '奖学金', '证书'],
+        'skills': ['专业技能', '技能', '技术栈', '掌握', '熟练', '精通'],
+        'work': ['工作经历', '工作履历', '实习经历', '实习经验', '工作经验'],
+        'projects': ['项目经验', '项目经历', '项目描述', '个人项目'],
+        'evaluation': ['个人评价', '自我评价', '个人总结', '自我总结']
     }
-    excl_pre = ['最近', '最高', '目前', '目前年']
     
-    # 密集格式PDF回退：全文搜索所有节关键词
-    all_kws = []
-    for sec, kws in section_keywords.items():
-        for kw in kws:
-            all_kws.append((sec, kw))
-    kw_pos = []
-    for sec, kw in all_kws:
-        idx = text.find(kw)
-        if idx >= 0:
-            kw_pos.append((idx, sec, kw))
-    kw_pos.sort()
-    if kw_pos:
-        # 去重：相同section类型50字内只保留第一个
-        deduped = []
-        seen = {}
-        for pos, sec, kw in kw_pos:
-            if sec in seen and abs(pos - seen[sec]) < 50:
-                continue
-            seen[sec] = pos
-            deduped.append((pos, sec, kw))
-        # 过滤：节标题特征 → 前有换行/空格/标点 且 前5字内汉字不超过2个
-        filtered = []
-        for pos, sec, kw in deduped:
-            pre = text[max(0,pos-5):pos]
-            chinese_count = len(re.findall(r'[\u4e00-\u9fff]', pre))
-            at_start = pos == 0 or (pos > 0 and text[pos-1] in '\n ')
-            is_title = at_start or chinese_count <= 2
-            if is_title:
-                filtered.append((pos, sec, kw))
-        if len(filtered) >= 3:
-            for i, (pos, sec, kw) in enumerate(filtered):
-                start = pos
-                end = filtered[i+1][0] if i+1 < len(filtered) else len(text)
-                sec_text = text[start:end].strip()
-                # 跳过内容太短的节（仅标题无正文，可能是假匹配）
-                content_after_kw = sec_text[len(kw):].strip()
-                if len(content_after_kw) < 5:
-                    continue
-                if sec_text:
-                    if sec in result:
-                        result[sec] += '\n\n' + sec_text
-                    else:
-                        result[sec] = sec_text
-            if result:
-                return result
-
     for line in lines:
-        s = line.strip()
-        if not s:
+        line = line.strip()
+        if not line:
             continue
-        clean = re.sub(r'^[^\w\u4e00-\u9fff]+\s*', '', s)
-        
-        found = None
-        for sec, kws in section_keywords.items():
-            if any(clean.startswith(p) for p in excl_pre):
-                break
-            if len(clean) >= 80:
-                segs = [x.strip() for x in re.split(r'[。；;]', clean) if x.strip()]
-                for seg in segs:
-                    if any(seg.startswith(kw) for kw in kws):
-                        found = sec
-                        break
-                if found:
-                    break
-            if any(clean.startswith(kw) for kw in kws) and len(s) < 80:
-                found = sec
+            
+        # 检测是否是新的模块标题
+        found_section = None
+        for section, keywords in section_keywords.items():
+            if any(kw in line for kw in keywords) and len(line) < 20:
+                found_section = section
                 break
         
-        if found:
-            if cur_sec and cur_content:
-                txt = '\n'.join(cur_content)
-                if cur_sec in result:
-                    result[cur_sec] += '\n\n' + txt
-                else:
-                    result[cur_sec] = txt
-            cur_sec = found
-            cur_content = [s]
-        elif cur_sec:
-            cur_content.append(s)
+        if found_section:
+            if current_section and current_content:
+                modules[current_section] = '\n'.join(current_content)
+            current_section = found_section
+            current_content = []
+        elif current_section:
+            current_content.append(line)
     
-    if cur_sec and cur_content:
-        txt = '\n'.join(cur_content)
-        if cur_sec in result:
-            result[cur_sec] += '\n\n' + txt
-        else:
-            result[cur_sec] = txt
+    # 保存最后一个模块
+    if current_section and current_content:
+        modules[current_section] = '\n'.join(current_content)
     
-    if not result:
-        result['raw'] = text
+    # 如果没有解析出任何模块，将整个文本作为原始内容
+    if not modules:
+        modules['raw'] = text
     
-    return result
+    return modules
+
 def generate_pdf_html(resume_text: str, title: str = "优化简历") -> str:
     """v3: 美化PDF用的HTML模板"""
     html = f"""
@@ -493,30 +419,16 @@ def generate_pdf_html(resume_text: str, title: str = "优化简历") -> str:
 
 @router.post("/upload", response_model=ResumeUploadResponse)
 async def upload_resume(file: UploadFile = File(...)):
-    """上传并解析简历 + v3模块化解析 (支持 .docx/.pdf/.txt/.xlsx)"""
-    name = file.filename.lower()
-    ext = name.rsplit('.', 1)[-1] if '.' in name else ''
-    
-    if ext not in ('docx', 'pdf', 'txt', 'xlsx', 'doc'):
-        raise HTTPException(400, "仅支持 .docx/.pdf/.txt/.xlsx/.doc 格式")
+    """上传并解析简历 + v3模块化解析"""
+    if not file.filename.endswith('.docx'):
+        raise HTTPException(400, "仅支持 .docx 格式")
     
     file_path = UPLOAD_DIR / file.filename
     content = await file.read()
     with open(file_path, 'wb') as f:
         f.write(content)
     
-    if ext == 'docx':
-        text = extract_text_from_docx(str(file_path))
-    elif ext == 'pdf':
-        text = extract_text_from_pdf(str(file_path))
-    elif ext == 'txt':
-        text = extract_text_from_txt(str(file_path))
-    elif ext == 'xlsx':
-        text = extract_text_from_xlsx(str(file_path))
-    elif ext == 'doc':
-        text = extract_text_from_doc(str(file_path))
-    else:
-        text = ""
+    text = extract_text_from_docx(str(file_path))
     info = extract_resume_info(text)
     modules = parse_resume_modules(text)  # v3: 模块化解析
     
@@ -613,7 +525,7 @@ async def optimize_resume(request: ResumeOptimizeRequest):
     )
     
     try:
-        r = ark_call([{"role": "user", "content": prompt}], temp=0.5, max_tokens=8192, retries=3)
+        r = ark_call([{"role": "user", "content": prompt}], temp=0.5, max_tokens=6000)
         if not r.get('success'):
             raise Exception(r.get('error', 'ARK call failed'))
         
@@ -649,7 +561,7 @@ async def optimize_resume(request: ResumeOptimizeRequest):
                 target_job=request.target_job,
                 job_jd=request.job_jd or "未提供"
             )
-            r2 = ark_call([{"role": "user", "content": score_prompt}], temp=0.3, max_tokens=4096, retries=3)
+            r2 = ark_call([{"role": "user", "content": score_prompt}], temp=0.3, max_tokens=3000)
             if r2.get('success'):
                 score_result = extract_json_from_text(r2['data'])
                 new_score = score_result
@@ -660,22 +572,17 @@ async def optimize_resume(request: ResumeOptimizeRequest):
         except Exception as e:
             print(f"New score error: {e}")
         
-        # 提取每项技能熟练度评分
-        skill_scores = new_score.get('skill_scores', {}) if new_score else {}
-        
         return ResumeOptimizeResult(
             optimized_text=optimized,
             changes=changes or [{"type": "整体", "description": "AI全面优化简历"}],
             new_score=new_score or {},
-            score_improvement=score_improvement or {},
-            skill_scores=skill_scores or None
+            score_improvement=score_improvement or {}
         )
     except Exception as e:
         return ResumeOptimizeResult(
             optimized_text=request.resume_text,
             changes=[{"type": "错误", "description": f"优化失败: {str(e)}"}],
             new_score={},
-            skill_scores=None,
             score_improvement={}
         )
 

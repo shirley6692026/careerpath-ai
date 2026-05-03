@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useApp } from './context/AppContext';
 import { skillRadar } from './services/api';
 
 const JOB_EXAMPLES = ['产品经理', '前端开发工程师', '数据分析师', 'AI产品经理', '全栈开发'];
@@ -9,6 +10,14 @@ export default function SkillRadar() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { state: appState, updateState } = useApp();
+  // 从全局Context预填共享信息
+  useEffect(() => {
+    if (appState.sharedTargetJob && !targetJob) {
+      setTargetJob(appState.sharedTargetJob);
+    }
+  }, []);
+
 
   const handleAnalyze = async () => {
     if (!skills.trim() || !targetJob.trim()) return;
