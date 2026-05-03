@@ -1061,13 +1061,13 @@ AI认知力是理解AI能力边界和适用场景的能力。
         </div>
 
         {/* 操作按钮 */}
-        <div className="flex gap-4 justify-center">
+        <div className="flex gap-4 justify-center flex-wrap">
           <button
             onClick={generateCertificate}
             className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-medium hover:shadow-lg transition-all"
           >
             🏆 生成HAIC证书
-          {/* 新增功能按钮 */}
+          </button>
           <button
             onClick={() => generatePersonalizedPlan()}
             className="px-6 py-3 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-lg font-medium hover:shadow-lg transition-all"
@@ -1079,8 +1079,6 @@ AI认知力是理解AI能力边界和适用场景的能力。
             className="px-6 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg font-medium hover:shadow-lg transition-all"
           >
             💬 与AI教练对话
-          </button>
-
           </button>
           <button
             onClick={startAssessment}
