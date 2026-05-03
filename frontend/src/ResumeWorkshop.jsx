@@ -32,6 +32,26 @@ export default function ResumeWorkshop() {
   const [modules, setModules] = useState(null);
   const [targetJob, setTargetJob] = useState('');
   const [jobJd, setJobJd] = useState('');
+  // ========== 岗位定制版本状态 ==========
+  const [jobKeywords, setJobKeywords] = useState([]);
+  const [matchedKeywords, setMatchedKeywords] = useState([]);
+  const [missingKeywords, setMissingKeywords] = useState([]);
+  const [keywordMatchRate, setKeywordMatchRate] = useState(0);
+  const [showKeywordAnalysis, setShowKeywordAnalysis] = useState(false);
+
+  // ========== 多版本管理状态 ==========
+  const [resumeVersions, setResumeVersions] = useState(() => {
+    try {
+      const saved = localStorage.getItem('careerpath_resume_versions');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [currentVersionId, setCurrentVersionId] = useState(null);
+  const [showVersionManager, setShowVersionManager] = useState(false);
+  const [versionName, setVersionName] = useState('');
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [showPreview, setShowPreview] = useState(false); // v3.1: 预览弹窗
@@ -174,7 +194,99 @@ export default function ResumeWorkshop() {
     }
   };
 
-  // ========== 进入修改模式 ==========
+  
+  // ========== 岗位关键词提取 ==========
+  const extractJobKeywords = async () => {
+    if (!jobJd || jobJd.length < 20) {
+      setError('请粘贴完整的职位描述（至少20字）');
+      return;
+    }
+    
+    setLoading(true);
+    setError('');
+    try {
+      const res = await fetch(`${API_BASE}/api/resume/extract-jd-keywords`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jd_text: jobJd }),
+      });
+      const data = await res.json();
+      if (data.keywords) {
+        setJobKeywords(data.keywords);
+        const resumeTextLower = (resumeText || '').toLowerCase();
+        const matched = data.keywords.filter(kw => 
+          resumeTextLower.includes(kw.toLowerCase())
+        );
+        const missing = data.keywords.filter(kw => 
+          !resumeTextLower.includes(kw.toLowerCase())
+        );
+        setMatchedKeywords(matched);
+        setMissingKeywords(missing);
+        setKeywordMatchRate(Math.round((matched.length / data.keywords.length) * 100));
+        setShowKeywordAnalysis(true);
+      }
+    } catch (err) {
+      setError('提取JD关键词失败: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ========== 多版本管理 ==========
+  const saveVersion = (name, text, metadata = {}) => {
+    const version = {
+      id: Date.now().toString(),
+      name: name || `版本 ${resumeVersions.length + 1}`,
+      text: text,
+      targetJob: targetJob,
+      jobJd: jobJd,
+      createdAt: new Date().toISOString(),
+      score: newScore?.new_overall_score || initialScore?.overall_score,
+      metadata: metadata,
+    };
+    
+    const updated = [version, ...resumeVersions].slice(0, 20);
+    setResumeVersions(updated);
+    setCurrentVersionId(version.id);
+    localStorage.setItem('careerpath_resume_versions', JSON.stringify(updated));
+    return version.id;
+  };
+
+  const loadVersion = (versionId) => {
+    const version = resumeVersions.find(v => v.id === versionId);
+    if (version) {
+      setResumeText(version.text);
+      setTargetJob(version.targetJob || '');
+      setJobJd(version.jobJd || '');
+      setCurrentVersionId(versionId);
+      setError('');
+    }
+  };
+
+  const deleteVersion = (versionId) => {
+    const updated = resumeVersions.filter(v => v.id !== versionId);
+    setResumeVersions(updated);
+    localStorage.setItem('careerpath_resume_versions', JSON.stringify(updated));
+    if (currentVersionId === versionId) {
+      setCurrentVersionId(null);
+    }
+  };
+
+  const exportVersions = () => {
+    const exportData = {
+      exportDate: new Date().toISOString(),
+      versions: resumeVersions,
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `careerpath-resume-versions-${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+// ========== 进入修改模式 ==========
   const handleEnterEdit = () => {
     setEditedText(optimizeResult?.optimized_text || '');
     setActiveTab('edit');
@@ -367,6 +479,65 @@ export default function ResumeWorkshop() {
                   className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
                 <p className="text-xs text-gray-500 mt-1">💡 填写JD后，AI能更精准地匹配关键词和优化简历</p>
+                
+                {/* 关键词匹配分析 */}
+                {showKeywordAnalysis && (
+                  <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-blue-800">
+                        关键词匹配度: {keywordMatchRate}%
+                      </span>
+                      <span className="text-xs text-blue-600">
+                        {matchedKeywords.length}/{jobKeywords.length} 匹配
+                      </span>
+                    </div>
+                    
+                    {/* 进度条 */}
+                    <div className="w-full bg-blue-200 rounded-full h-2 mb-3">
+                      <div 
+                        className="bg-blue-600 h-2 rounded-full transition-all duration-500"
+                        style={{ width: `${keywordMatchRate}%` }}
+                      />
+                    </div>
+                    
+                    {/* 已匹配关键词 */}
+                    {matchedKeywords.length > 0 && (
+                      <div className="mb-2">
+                        <span className="text-xs font-medium text-green-700">✅ 已匹配:</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {matchedKeywords.map((kw, i) => (
+                            <span key={i} className="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">
+                              {kw}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    
+                    {/* 缺失关键词 */}
+                    {missingKeywords.length > 0 && (
+                      <div>
+                        <span className="text-xs font-medium text-orange-700">⚠️ 缺失:</span>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {missingKeywords.map((kw, i) => (
+                            <span key={i} className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full">
+                              {kw}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+                
+                <button
+                  onClick={extractJobKeywords}
+                  disabled={loading || !jobJd || jobJd.length < 20}
+                  className="mt-2 w-full py-2 px-4 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed hover:shadow-lg transition-all"
+                >
+                  {loading ? '🔍 分析中...' : '🔍 分析JD关键词匹配度'}
+                </button>
+
               </div>
             </div>
           )}
@@ -695,7 +866,117 @@ export default function ResumeWorkshop() {
       )}
 
       {/* ========== AI生成新简历 ========== */}
-      {activeTab === 'newresume' && (
+      
+      {/* 版本管理器悬浮按钮 */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2">
+        <button
+          onClick={() => setShowVersionManager(!showVersionManager)}
+          className="w-12 h-12 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center text-xl"
+          title="简历版本管理"
+        >
+          📁
+        </button>
+        
+        {currentVersionId && (
+          <button
+            onClick={() => {
+              const name = prompt('版本名称:', versionName || `版本 ${resumeVersions.length + 1}`);
+              if (name) {
+                saveVersion(name, mergedText || optimizeResult?.optimized_text || resumeText);
+                setVersionName('');
+                alert('版本已保存!');
+              }
+            }}
+            className="w-12 h-12 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-full shadow-lg hover:shadow-xl transition-all flex items-center justify-center text-xl"
+            title="保存当前版本"
+          >
+            💾
+          </button>
+        )}
+      </div>
+
+      {/* 版本管理器面板 */}
+      {showVersionManager && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+            <div className="p-4 border-b flex items-center justify-between bg-gradient-to-r from-purple-600 to-pink-600 text-white">
+              <h3 className="font-bold text-lg">📁 简历版本管理</h3>
+              <button 
+                onClick={() => setShowVersionManager(false)}
+                className="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-4 overflow-y-auto flex-1">
+              {resumeVersions.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <div className="text-4xl mb-2">📭</div>
+                  <p>暂无保存的版本</p>
+                  <p className="text-sm mt-1">优化简历后可以保存多个版本</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {resumeVersions.map((version) => (
+                    <div 
+                      key={version.id}
+                      className={`p-3 rounded-lg border-2 transition-all cursor-pointer ${
+                        currentVersionId === version.id 
+                          ? 'border-purple-500 bg-purple-50' 
+                          : 'border-gray-200 hover:border-purple-300'
+                      }`}
+                      onClick={() => loadVersion(version.id)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">{version.name}</div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {new Date(version.createdAt).toLocaleString('zh-CN')} 
+                            {version.targetJob && ` · ${version.targetJob}`}
+                            {version.score && ` · ${version.score}分`}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {currentVersionId === version.id && (
+                            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">
+                              当前
+                            </span>
+                          )}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (confirm('确定删除这个版本?')) {
+                                deleteVersion(version.id);
+                              }
+                            }}
+                            className="w-8 h-8 rounded-full hover:bg-red-100 text-red-500 flex items-center justify-center transition-colors"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            {resumeVersions.length > 0 && (
+              <div className="p-4 border-t bg-gray-50">
+                <button
+                  onClick={exportVersions}
+                  className="w-full py-2 px-4 bg-gray-800 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
+                >
+                  📥 导出所有版本 (JSON)
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+{activeTab === 'newresume' && (
         <div className="space-y-4">
           {!optimizeResult ? (
             <div className="text-center py-8">

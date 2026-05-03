@@ -692,3 +692,42 @@ async def generate_pdf(request: dict):
         "message": "请使用浏览器的'打印为PDF'功能，或复制HTML到在线PDF转换工具"
     }
 
+
+@router.post("/extract-jd-keywords")
+async def extract_jd_keywords(request: dict):
+    """从JD中提取关键词"""
+    jd_text = request.get('jd_text', '')
+    
+    if not jd_text or len(jd_text) < 20:
+        return {"keywords": [], "error": "JD文本太短"}
+    
+    prompt = f"""你是一位HR专家。请从以下职位描述(JD)中提取核心关键词。
+
+要求:
+1. 提取硬技能关键词(如Python、React、数据分析等)
+2. 提取软技能关键词(如沟通能力、团队协作等)
+3. 提取行业/领域关键词
+4. 提取工具/技术关键词
+5. 总共提取10-15个最关键的词
+6. 每个词不超过6个字
+
+职位描述:
+{jd_text[:2000]}
+
+请直接输出JSON格式:
+{{
+    "keywords": ["关键词1", "关键词2", ...]
+}}
+
+只输出JSON，不要其他内容。"""
+    
+    try:
+        r = ark_call([{"role": "user", "content": prompt}], temp=0.3, max_tokens=1000)
+        if r.get('success'):
+            result = extract_json_from_text(r['data'])
+            return {"keywords": result.get('keywords', [])}
+        else:
+            return {"keywords": [], "error": "AI调用失败"}
+    except Exception as e:
+        return {"keywords": [], "error": str(e)}
+
