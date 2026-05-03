@@ -731,3 +731,57 @@ async def extract_jd_keywords(request: dict):
     except Exception as e:
         return {"keywords": [], "error": str(e)}
 
+
+@router.post("/haic/coach")
+async def haic_coach(request: dict):
+    """HAIC AI教练对话"""
+    message = request.get('message', '')
+    context = request.get('context', '')
+    history = request.get('history', [])
+    scores = request.get('scores', {})
+    
+    prompt = f"""你是一位专业的HAIC（人机协作指数）教练。你的任务是帮助用户提升AI时代的职业竞争力。
+
+背景信息：
+{context}
+
+用户当前HAIC分数：
+{json.dumps(scores, ensure_ascii=False)}
+
+对话历史：
+{json.dumps(history[-3:], ensure_ascii=False)}
+
+用户问题：{message}
+
+请作为教练回答：
+1. 用温暖专业的语气
+2. 给出具体可操作的建议
+3. 如果涉及概念，用简单易懂的方式解释
+4. 适当鼓励用户
+5. 回答控制在200字以内
+
+请直接回复内容，不要加前缀。"""
+    
+    try:
+        r = ark_call([{"role": "user", "content": prompt}], temp=0.7, max_tokens=1000)
+        if r.get('success'):
+            return {
+                "response": r['data'],
+                "suggestions": [
+                    "给我一道练习题",
+                    "推荐学习资源", 
+                    "如何应用到求职中",
+                    "我的薄弱点在哪"
+                ]
+            }
+        else:
+            return {
+                "response": "抱歉，我暂时无法回答。你可以尝试问：什么是HAIC，或者如何提升我的AI认知力？",
+                "suggestions": ["什么是HAIC", "如何提升HAIC", "推荐学习资源"]
+            }
+    except Exception as e:
+        return {
+            "response": f"教练暂时离线：{str(e)}",
+            "suggestions": ["稍后重试", "查看学习材料"]
+        }
+
