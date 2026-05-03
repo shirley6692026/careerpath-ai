@@ -1061,7 +1061,7 @@ AI认知力是理解AI能力边界和适用场景的能力。
         </div>
 
         {/* 操作按钮 */}
-        <div className="flex gap-4 justify-center flex-wrap">
+        <div className="flex gap-4 justify-center flex-wrap mb-8">
           <button
             onClick={generateCertificate}
             className="px-6 py-3 bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg font-medium hover:shadow-lg transition-all"
@@ -1087,270 +1087,268 @@ AI认知力是理解AI能力边界和适用场景的能力。
             🔄 重新评估
           </button>
         </div>
-{/* AI教练对话弹窗 */}
-      {showCoach && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full h-[600px] flex flex-col">
-            <div className="p-4 border-b bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-t-xl flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl">🤖</span>
-                <div>
-                  <div className="font-bold">HAIC AI教练</div>
-                  <div className="text-xs opacity-80">随时解答你的问题</div>
-                </div>
-              </div>
-              <button 
-                onClick={() => setShowCoach(false)}
-                className="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {coachMessages.map((msg, i) => (
-                <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] p-3 rounded-lg ${
-                    msg.role === 'user' 
-                      ? 'bg-blue-600 text-white rounded-br-none' 
-                      : 'bg-gray-100 text-gray-800 rounded-bl-none'
-                  }`}>
-                    <div className="text-sm">{msg.content}</div>
-                    {msg.suggestions && msg.suggestions.length > 0 && (
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {msg.suggestions.map((s, j) => (
-                          <button
-                            key={j}
-                            onClick={() => sendCoachMessage(s)}
-                            className="px-3 py-1 bg-white/20 rounded-full text-xs hover:bg-white/30 transition-colors"
-                          >
-                            {s}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {coachLoading && (
-                <div className="flex justify-start">
-                  <div className="bg-gray-100 p-3 rounded-lg rounded-bl-none">
-                    <div className="flex gap-1">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100" />
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200" />
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-            
-            <div className="p-4 border-t">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={coachInput}
-                  onChange={(e) => setCoachInput(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && sendCoachMessage(coachInput)}
-                  placeholder="问AI教练任何问题..."
-                  className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-                <button
-                  onClick={() => sendCoachMessage(coachInput)}
-                  disabled={coachLoading || !coachInput.trim()}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg disabled:opacity-50 hover:bg-purple-700 transition-colors"
-                >
-                  发送
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* 个性化学习计划弹窗 */}
-      {showPlan && personalizedPlan && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">📋 你的HAIC提升计划</h2>
+        {/* AI教练对话弹窗 */}
+        {showCoach && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full h-[600px] flex flex-col">
+              <div className="p-4 border-b bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-t-xl flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">🤖</span>
+                  <div>
+                    <div className="font-bold">HAIC AI教练</div>
+                    <div className="text-xs opacity-80">随时解答你的问题</div>
+                  </div>
+                </div>
                 <button 
-                  onClick={() => setShowPlan(false)}
-                  className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center"
+                  onClick={() => setShowCoach(false)}
+                  className="w-8 h-8 rounded-full hover:bg-white/20 flex items-center justify-center transition-colors"
                 >
                   ✕
                 </button>
               </div>
               
-              <div className="bg-blue-50 rounded-lg p-4 mb-6">
-                <p className="text-blue-800 font-medium">{personalizedPlan.summary}</p>
-              </div>
-              
-              {personalizedPlan.strengths.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="font-bold text-gray-800 mb-3">💪 你的优势</h3>
-                  <div className="grid gap-3">
-                    {personalizedPlan.strengths.map((s, i) => (
-                      <div key={i} className="bg-green-50 rounded-lg p-3">
-                        <div className="font-medium text-green-800">{s.name} ({s.score}分)</div>
-                        <div className="text-sm text-green-700">{s.suggestion}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {personalizedPlan.improvements.length > 0 && (
-                <div className="mb-6">
-                  <h3 className="font-bold text-gray-800 mb-3">🎯 提升重点</h3>
-                  <div className="space-y-4">
-                    {personalizedPlan.improvements.map((imp, i) => (
-                      <div key={i} className="border rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="font-medium">{imp.name} ({imp.score}分)</div>
-                          <span className={`px-2 py-0.5 rounded text-xs ${
-                            imp.priority === '高' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
-                          }`}>
-                            {imp.priority}优先级
-                          </span>
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {coachMessages.map((msg, i) => (
+                  <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                    <div className={`max-w-[80%] p-3 rounded-lg ${
+                      msg.role === 'user' 
+                        ? 'bg-blue-600 text-white rounded-br-none' 
+                        : 'bg-gray-100 text-gray-800 rounded-bl-none'
+                    }`}>
+                      <div className="text-sm">{msg.content}</div>
+                      {msg.suggestions && msg.suggestions.length > 0 && (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {msg.suggestions.map((s, j) => (
+                            <button
+                              key={j}
+                              onClick={() => sendCoachMessage(s)}
+                              className="px-3 py-1 bg-white/20 rounded-full text-xs hover:bg-white/30 transition-colors"
+                            >
+                              {s}
+                            </button>
+                          ))}
                         </div>
-                        <div className="grid md:grid-cols-2 gap-3">
-                          <div>
-                            <div className="text-sm font-medium text-gray-600 mb-1">行动计划</div>
-                            <ul className="space-y-1">
-                              {imp.actions.map((a, j) => (
-                                <li key={j} className="text-sm text-gray-600 flex items-start gap-1">
-                                  <span>•</span> {a}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-gray-600 mb-1">学习资源</div>
-                            <ul className="space-y-1">
-                              {imp.resources.map((r, j) => (
-                                <li key={j} className="text-sm text-gray-600">{r}</li>
-                              ))}
-                            </ul>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => startTraining(HAIC_DIMENSIONS.find(d => d.name === imp.name)?.id)}
-                          className="mt-3 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 transition-colors"
-                        >
-                          🚀 开始专项训练
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              <div className="mb-6">
-                <h3 className="font-bold text-gray-800 mb-3">📅 学习时间表</h3>
-                <div className="space-y-3">
-                  {personalizedPlan.timeline.map((t, i) => (
-                    <div key={i} className="flex items-center gap-4 bg-gray-50 rounded-lg p-3">
-                      <div className="w-20 font-medium text-gray-700">{t.phase}</div>
-                      <div className="flex-1 text-gray-600">{t.focus}</div>
-                      <div className="text-sm text-gray-500">{t.hours}小时</div>
+                      )}
                     </div>
-                  ))}
-                </div>
+                  </div>
+                ))}
+                {coachLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-gray-100 p-3 rounded-lg rounded-bl-none">
+                      <div className="flex gap-1">
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100" />
+                        <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200" />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               
-              <div className="bg-yellow-50 rounded-lg p-4">
-                <div className="font-medium text-yellow-800 mb-1">📝 每周目标</div>
-                <div className="text-sm text-yellow-700">{personalizedPlan.weeklyGoal}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 学习训练模式 */}
-      {trainingMode && currentTraining && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <div>
-                  <h2 className="text-xl font-bold text-gray-800">
-                    🎯 {currentTraining.dimension.name} 专项训练
-                  </h2>
-                  <p className="text-sm text-gray-500">场景 {currentTraining.currentScenario + 1}/{currentTraining.scenarios.length}</p>
-                </div>
-                <button 
-                  onClick={() => setTrainingMode(false)}
-                  className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center"
-                >
-                  ✕
-                </button>
-              </div>
-              
-              {/* 学习材料 */}
-              {showLearningMaterial && (
-                <div className="mb-6 bg-blue-50 rounded-lg p-4">
-                  <h3 className="font-medium text-blue-800 mb-2">📚 学习材料</h3>
-                  <pre className="text-sm text-blue-700 whitespace-pre-wrap">{learningContent}</pre>
+              <div className="p-4 border-t">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={coachInput}
+                    onChange={(e) => setCoachInput(e.target.value)}
+                    onKeyPress={(e) => e.key === 'Enter' && sendCoachMessage(coachInput)}
+                    placeholder="问AI教练任何问题..."
+                    className="flex-1 px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  />
                   <button
-                    onClick={() => setShowLearningMaterial(false)}
-                    className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm"
+                    onClick={() => sendCoachMessage(coachInput)}
+                    disabled={coachLoading || !coachInput.trim()}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg disabled:opacity-50 hover:bg-purple-700 transition-colors"
                   >
-                    开始练习 →
+                    发送
                   </button>
                 </div>
-              )}
-              
-              {/* 场景练习 */}
-              {!showLearningMaterial && currentTraining.scenarios[currentTraining.currentScenario] && (
-                <div className="space-y-4">
-                  {(() => {
-                    const scenario = currentTraining.scenarios[currentTraining.currentScenario];
-                    return (
-                      <>
-                        <div className="bg-gray-50 rounded-lg p-4">
-                          <div className="font-medium text-gray-800 mb-2">{scenario.title}</div>
-                          <div className="text-gray-600 mb-4">{scenario.description}</div>
-                          <div className="space-y-2">
-                            {scenario.options.map((opt, i) => (
-                              <button
-                                key={i}
-                                onClick={() => {
-                                  const isCorrect = i === scenario.correct;
-                                  alert(isCorrect ? '✅ 正确！' + scenario.explanation : '❌ 再想想。' + scenario.explanation);
-                                  if (currentTraining.currentScenario < currentTraining.scenarios.length - 1) {
-                                    setCurrentTraining(prev => ({
-                                      ...prev,
-                                      currentScenario: prev.currentScenario + 1
-                                    }));
-                                  } else {
-                                    alert('🎉 训练完成！');
-                                    setTrainingMode(false);
-                                  }
-                                }}
-                                className="w-full p-3 text-left bg-white border rounded-lg hover:bg-blue-50 transition-colors"
-                              >
-                                {String.fromCharCode(65 + i)}. {opt}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-              )}
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
+        {/* 个性化学习计划弹窗 */}
+        {showPlan && personalizedPlan && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-3xl w-full max-h-[80vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-2xl font-bold text-gray-800">📋 你的HAIC提升计划</h2>
+                  <button 
+                    onClick={() => setShowPlan(false)}
+                    className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center"
+                  >
+                    ✕
+                  </button>
+                </div>
+                
+                <div className="bg-blue-50 rounded-lg p-4 mb-6">
+                  <p className="text-blue-800 font-medium">{personalizedPlan.summary}</p>
+                </div>
+                
+                {personalizedPlan.strengths.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="font-bold text-gray-800 mb-3">💪 你的优势</h3>
+                    <div className="grid gap-3">
+                      {personalizedPlan.strengths.map((s, i) => (
+                        <div key={i} className="bg-green-50 rounded-lg p-3">
+                          <div className="font-medium text-green-800">{s.name} ({s.score}分)</div>
+                          <div className="text-sm text-green-700">{s.suggestion}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {personalizedPlan.improvements.length > 0 && (
+                  <div className="mb-6">
+                    <h3 className="font-bold text-gray-800 mb-3">🎯 提升重点</h3>
+                    <div className="space-y-4">
+                      {personalizedPlan.improvements.map((imp, i) => (
+                        <div key={i} className="border rounded-lg p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="font-medium">{imp.name} ({imp.score}分)</div>
+                            <span className={`px-2 py-0.5 rounded text-xs ${
+                              imp.priority === '高' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                            }`}>
+                              {imp.priority}优先级
+                            </span>
+                          </div>
+                          <div className="grid md:grid-cols-2 gap-3">
+                            <div>
+                              <div className="text-sm font-medium text-gray-600 mb-1">行动计划</div>
+                              <ul className="space-y-1">
+                                {imp.actions.map((a, j) => (
+                                  <li key={j} className="text-sm text-gray-600 flex items-start gap-1">
+                                    <span>•</span> {a}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                            <div>
+                              <div className="text-sm font-medium text-gray-600 mb-1">学习资源</div>
+                              <ul className="space-y-1">
+                                {imp.resources.map((r, j) => (
+                                  <li key={j} className="text-sm text-gray-600">{r}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => startTraining(HAIC_DIMENSIONS.find(d => d.name === imp.name)?.id)}
+                            className="mt-3 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 transition-colors"
+                          >
+                            🚀 开始专项训练
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <div className="mb-6">
+                  <h3 className="font-bold text-gray-800 mb-3">📅 学习时间表</h3>
+                  <div className="space-y-3">
+                    {personalizedPlan.timeline.map((t, i) => (
+                      <div key={i} className="flex items-center gap-4 bg-gray-50 rounded-lg p-3">
+                        <div className="w-20 font-medium text-gray-700">{t.phase}</div>
+                        <div className="flex-1 text-gray-600">{t.focus}</div>
+                        <div className="text-sm text-gray-500">{t.hours}小时</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="bg-yellow-50 rounded-lg p-4">
+                  <div className="font-medium text-yellow-800 mb-1">📝 每周目标</div>
+                  <div className="text-sm text-yellow-700">{personalizedPlan.weeklyGoal}</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 学习训练模式 */}
+        {trainingMode && currentTraining && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-800">
+                      🎯 {currentTraining.dimension.name} 专项训练
+                    </h2>
+                    <p className="text-sm text-gray-500">场景 {currentTraining.currentScenario + 1}/{currentTraining.scenarios.length}</p>
+                  </div>
+                  <button 
+                    onClick={() => setTrainingMode(false)}
+                    className="w-8 h-8 rounded-full hover:bg-gray-100 flex items-center justify-center"
+                  >
+                    ✕
+                  </button>
+                </div>
+                
+                {/* 学习材料 */}
+                {showLearningMaterial && (
+                  <div className="mb-6 bg-blue-50 rounded-lg p-4">
+                    <h3 className="font-medium text-blue-800 mb-2">📚 学习材料</h3>
+                    <pre className="text-sm text-blue-700 whitespace-pre-wrap">{learningContent}</pre>
+                    <button
+                      onClick={() => setShowLearningMaterial(false)}
+                      className="mt-3 px-4 py-2 bg-blue-600 text-white rounded-lg text-sm"
+                    >
+                      开始练习 →
+                    </button>
+                  </div>
+                )}
+                
+                {/* 场景练习 */}
+                {!showLearningMaterial && currentTraining.scenarios[currentTraining.currentScenario] && (
+                  <div className="space-y-4">
+                    {(() => {
+                      const scenario = currentTraining.scenarios[currentTraining.currentScenario];
+                      return (
+                        <>
+                          <div className="bg-gray-50 rounded-lg p-4">
+                            <div className="font-medium text-gray-800 mb-2">{scenario.title}</div>
+                            <div className="text-gray-600 mb-4">{scenario.description}</div>
+                            <div className="space-y-2">
+                              {scenario.options.map((opt, i) => (
+                                <button
+                                  key={i}
+                                  onClick={() => {
+                                    const isCorrect = i === scenario.correct;
+                                    alert(isCorrect ? '✅ 正确！' + scenario.explanation : '❌ 再想想。' + scenario.explanation);
+                                    if (currentTraining.currentScenario < currentTraining.scenarios.length - 1) {
+                                      setCurrentTraining(prev => ({
+                                        ...prev,
+                                        currentScenario: prev.currentScenario + 1
+                                      }));
+                                    } else {
+                                      alert('🎉 训练完成！');
+                                      setTrainingMode(false);
+                                    }
+                                  }}
+                                  className="w-full p-3 text-left bg-white border rounded-lg hover:bg-blue-50 transition-colors"
+                                >
+                                  {String.fromCharCode(65 + i)}. {opt}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
-  
-      
 }
