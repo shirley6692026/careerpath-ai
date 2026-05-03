@@ -1,116 +1,162 @@
 import { createContext, useContext, useState, useCallback } from 'react';
 
-// 全局共享数据模型
-const defaultState = {
-  // 简历数据
-  resume: {
-    text: null,
-    parsed: null,
-    modules: null,
-    targetJob: '',
-    jobJd: '',
-  },
-  // 评分数据
-  scores: {
-    initial: null,     // 初评
-    optimized: null,   // 优化后
-    skillScores: null, // 技能熟练度
-  },
-  // 诊断结果
-  diagnosis: null,
-  // 优化结果
-  optimization: {
-    text: null,
-    changes: [],
-  },
-  // JD分析结果
-  jdAnalysis: null,
-  // 能力雷达结果
-  skillRadar: null,
-  // 面试数据
-  interview: {
-    history: [],
-    results: null,
-  },
-  // 全局共享的目标岗位
-  sharedTargetJob: '',
-  sharedJobJd: '',
-};
+// CareerPath AI 全局状态管理
+// 打通各模块数据孤岛：简历 → JD → 面试 → 能力雷达
 
 const AppContext = createContext(null);
 
 export function AppProvider({ children }) {
-  const [state, setState] = useState(defaultState);
+  // ========== 用户画像 ==========
+  const [userProfile, setUserProfile] = useState(() => {
+    try {
+      const saved = localStorage.getItem('careerpath_user_profile');
+      return saved ? JSON.parse(saved) : {
+        name: '',
+        email: '',
+        phone: '',
+        school: '',
+        major: '',
+        graduationYear: '',
+        targetJob: '',
+        targetIndustry: '',
+        skills: [],
+        haicScore: null,
+        createdAt: new Date().toISOString(),
+      };
+    } catch {
+      return {};
+    }
+  });
 
-  // 通用更新器
-  const updateState = useCallback((path, value) => {
-    setState(prev => {
-      if (typeof path === 'string') {
-        const parts = path.split('.');
-        const newState = { ...prev };
-        let obj = newState;
-        for (let i = 0; i < parts.length - 1; i++) {
-          obj[parts[i]] = { ...obj[parts[i]] };
-          obj = obj[parts[i]];
-        }
-        obj[parts[parts.length - 1]] = value;
-        return newState;
-      } else if (typeof path === 'function') {
-        return path(prev);
-      }
-      return { ...prev, ...path };
+  // ========== 简历数据 ==========
+  const [resumeData, setResumeData] = useState(() => {
+    try {
+      const saved = localStorage.getItem('careerpath_resume_data');
+      return saved ? JSON.parse(saved) : {
+        text: '',
+        parsed: null,
+        modules: null,
+        versions: [],
+        currentVersionId: null,
+      };
+    } catch {
+      return {};
+    }
+  });
+
+  // ========== JD数据 ==========
+  const [jdData, setJdData] = useState(() => {
+    try {
+      const saved = localStorage.getItem('careerpath_jd_data');
+      return saved ? JSON.parse(saved) : {
+        text: '',
+        translated: null,
+        keywords: [],
+        skills: [],
+        salary: null,
+        company: '',
+        position: '',
+      };
+    } catch {
+      return {};
+    }
+  });
+
+  // ========== 面试数据 ==========
+  const [interviewData, setInterviewData] = useState(() => {
+    try {
+      const saved = localStorage.getItem('careerpath_interview_data');
+      return saved ? JSON.parse(saved) : {
+        history: [],
+        currentSession: null,
+        scores: [],
+        feedback: [],
+      };
+    } catch {
+      return {};
+    }
+  });
+
+  // ========== 能力雷达数据 ==========
+  const [skillRadarData, setSkillRadarData] = useState(() => {
+    try {
+      const saved = localStorage.getItem('careerpath_skill_radar');
+      return saved ? JSON.parse(saved) : {
+        skills: [],
+        scores: {},
+        targetSkills: [],
+        gaps: [],
+        lastAssessment: null,
+      };
+    } catch {
+      return {};
+    }
+  });
+
+  // ========== 全局状态方法 ==========
+  
+  const updateUserProfile = useCallback((updates) => {
+    setUserProfile(prev => {
+      const updated = { ...prev, ...updates, updatedAt: new Date().toISOString() };
+      localStorage.setItem('careerpath_user_profile', JSON.stringify(updated));
+      return updated;
     });
   }, []);
 
-  // 便捷方法：设置简历数据
-  const setResume = useCallback((data) => {
-    updateState('resume.text', data.text);
-    updateState('resume.parsed', data.parsed);
-    updateState('resume.modules', data.modules);
-    if (data.targetJob) updateState('resume.targetJob', data.targetJob);
-    if (data.jobJd) updateState('resume.jobJd', data.jobJd);
-    // 同步到共享字段
-    if (data.targetJob) updateState('sharedTargetJob', data.targetJob);
-    if (data.jobJd) updateState('sharedJobJd', data.jobJd);
-  }, [updateState]);
+  const updateResumeData = useCallback((updates) => {
+    setResumeData(prev => {
+      const updated = { ...prev, ...updates, updatedAt: new Date().toISOString() };
+      localStorage.setItem('careerpath_resume_data', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
-  // 便捷方法：设置评分数据
-  const setScore = useCallback((type, data) => {
-    updateState(`scores.${type}`, data);
-    if (data?.skill_scores) {
-      updateState('scores.skillScores', data.skill_scores);
-    }
-  }, [updateState]);
+  const updateJdData = useCallback((updates) => {
+    setJdData(prev => {
+      const updated = { ...prev, ...updates, updatedAt: new Date().toISOString() };
+      localStorage.setItem('careerpath_jd_data', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
-  // 便捷方法：设置优化结果
-  const setOptimization = useCallback((data) => {
-    updateState('optimization.text', data.optimized_text);
-    updateState('optimization.changes', data.changes);
-    if (data.new_score) updateState('scores.optimized', data.new_score);
-    if (data.skill_scores) updateState('scores.skillScores', data.skill_scores);
-  }, [updateState]);
+  const updateInterviewData = useCallback((updates) => {
+    setInterviewData(prev => {
+      const updated = { ...prev, ...updates, updatedAt: new Date().toISOString() };
+      localStorage.setItem('careerpath_interview_data', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
-  // 重置
-  const resetAll = useCallback(() => setState(defaultState), []);
+  const updateSkillRadarData = useCallback((updates) => {
+    setSkillRadarData(prev => {
+      const updated = { ...prev, ...updates, updatedAt: new Date().toISOString() };
+      localStorage.setItem('careerpath_skill_radar', JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
 
-  return (
-    <AppContext.Provider value={{
-      state,
-      updateState,
-      setResume,
-      setScore,
-      setOptimization,
-      resetAll,
-    }}>
-      {children}
-    </AppContext.Provider>
-  );
+  const value = {
+    userProfile,
+    resumeData,
+    jdData,
+    interviewData,
+    skillRadarData,
+    updateUserProfile,
+    updateResumeData,
+    updateJdData,
+    updateInterviewData,
+    updateSkillRadarData,
+  };
+
+  return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 
-export function useApp() {
-  const ctx = useContext(AppContext);
-  if (!ctx) throw new Error('useApp must be used within AppProvider');
-  return ctx;
+export function useAppContext() {
+  const context = useContext(AppContext);
+  if (!context) {
+    throw new Error('useAppContext must be used within AppProvider');
+  }
+  return context;
 }
 
 export default AppContext;

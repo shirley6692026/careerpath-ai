@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { useApp } from './context/AppContext';
+import { useAppContext } from './context/AppContext';
 import { jdTranslate, jdFromImage } from './services/api';
 
 const SAMPLES = [
@@ -34,7 +34,7 @@ export default function JDTranslator() {
   const [ocrText, setOcrText] = useState('');
   const [showOcr, setShowOcr] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const { state: appState, updateState } = useApp();
+  const { state: appState, updateState } = useAppContext();
   // 从全局Context预填共享JD
   useEffect(() => {
     if (appState.sharedJobJd && !jdText) {
