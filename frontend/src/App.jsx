@@ -3,6 +3,10 @@ import JDTranslator from './JDTranslator'
 import SkillRadar from './SkillRadar'
 import Interview from './Interview'
 import ResumeWorkshop from './ResumeWorkshop'
+import JobBattleReport from './components/JobBattleReport'
+import CareerNavigator from './components/CareerNavigator'
+import LearningRoadmap from './components/LearningRoadmap'
+import JobDashboard from './components/JobDashboard'
 import { AppProvider } from './context/AppContext'
 import HAICCoach from './HAICCoach'
 
@@ -23,12 +27,17 @@ function App() {
               <p className="text-xs text-slate-400">AI-Native 求职导航</p>
             </div>
           </div>
-          <nav className="flex gap-1.5">
+          <nav className="flex gap-1.5 flex-wrap">
             {[
               { key: 'jd', label: '📄 JD翻译官' },
               { key: 'skill', label: '🎯 能力雷达' },
               { key: 'interview', label: '🤖 AI面试' },
               { key: 'resume', label: '📄 简历工坊' },
+              { key: 'haic', label: '🧠 HAIC' },
+              { key: 'report', label: '📊 战报' },
+              { key: 'navigator', label: '🧭 导航' },
+              { key: 'roadmap', label: '📚 路线' },
+              { key: 'dashboard', label: '📈 仪表' },
             ].map(item => (
               <button key={item.key} onClick={() => setPage(item.key)}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -37,17 +46,7 @@ function App() {
                 {item.label}
               </button>
             ))}
-                    <button 
-            onClick={() => setPage('haic')}
-            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-              page === 'haic' 
-                ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white' 
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-          >
-            🧠 HAIC
-          </button>
-</nav>
+          </nav>
         </div>
       </header>
 
@@ -58,6 +57,10 @@ function App() {
         {page === 'interview' && <Interview />}
         {page === 'resume' && <ResumeWorkshop />}
         {page === 'haic' && <HAICCoach />}
+        {page === 'report' && <JobBattleReport />}
+        {page === 'navigator' && <CareerNavigator />}
+        {page === 'roadmap' && <LearningRoadmap />}
+        {page === 'dashboard' && <JobDashboard />}
       </main>
 
         <footer className="text-center py-6 text-sm text-slate-400">
@@ -98,6 +101,31 @@ function HomePage({ onNavigate }) {
           📄 简历工坊
         </button>
       </div>
+      
+      {/* 新增功能入口 */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto mb-12">
+        <button onClick={() => onNavigate('haic')}
+          className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition text-center">
+          <div className="text-2xl mb-2">🧠</div>
+          <div className="font-semibold text-slate-700 text-sm">HAIC教练</div>
+        </button>
+        <button onClick={() => onNavigate('report')}
+          className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition text-center">
+          <div className="text-2xl mb-2">📊</div>
+          <div className="font-semibold text-slate-700 text-sm">求职战报</div>
+        </button>
+        <button onClick={() => onNavigate('navigator')}
+          className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition text-center">
+          <div className="text-2xl mb-2">🧭</div>
+          <div className="font-semibold text-slate-700 text-sm">职业导航</div>
+        </button>
+        <button onClick={() => onNavigate('roadmap')}
+          className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition text-center">
+          <div className="text-2xl mb-2">📚</div>
+          <div className="font-semibold text-slate-700 text-sm">学习路线</div>
+        </button>
+      </div>
+      
       <div className="grid grid-cols-3 gap-6 max-w-3xl mx-auto">
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
           <div className="text-3xl mb-3">🧠</div>
