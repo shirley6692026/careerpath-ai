@@ -4,6 +4,7 @@ import SkillRadar from './SkillRadar'
 import Interview from './Interview'
 import ResumeWorkshop from './ResumeWorkshop'
 import { AppProvider } from './context/AppContext'
+import HAICCoach from './HAICCoach'
 
 function App() {
   const [page, setPage] = useState('home');
@@ -36,7 +37,17 @@ function App() {
                 {item.label}
               </button>
             ))}
-          </nav>
+                    <button 
+            onClick={() => setPage('haic')}
+            className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+              page === 'haic' 
+                ? 'bg-gradient-to-r from-purple-600 to-blue-600 text-white' 
+                : 'text-gray-600 hover:bg-gray-100'
+            }`}
+          >
+            🧠 HAIC
+          </button>
+</nav>
         </div>
       </header>
 
@@ -46,6 +57,7 @@ function App() {
         {page === 'skill' && <SkillRadar />}
         {page === 'interview' && <Interview />}
         {page === 'resume' && <ResumeWorkshop />}
+        {page === 'haic' && <HAICCoach />}
       </main>
 
         <footer className="text-center py-6 text-sm text-slate-400">
