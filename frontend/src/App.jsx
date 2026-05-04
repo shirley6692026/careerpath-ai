@@ -7,6 +7,7 @@ import JobBattleReport from './components/JobBattleReport'
 import CareerNavigator from './components/CareerNavigator'
 import LearningRoadmap from './components/LearningRoadmap'
 import JobDashboard from './components/JobDashboard'
+import CompetitiveAnalysis from './components/CompetitiveAnalysis'
 import { AppProvider } from './context/AppContext'
 import HAICCoach from './HAICCoach'
 
@@ -38,6 +39,7 @@ function App() {
               { key: 'navigator', label: '🧭 导航' },
               { key: 'roadmap', label: '📚 路线' },
               { key: 'dashboard', label: '📈 仪表' },
+              { key: 'competitive', label: '📊 竞品' },
             ].map(item => (
               <button key={item.key} onClick={() => setPage(item.key)}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -61,10 +63,11 @@ function App() {
         {page === 'navigator' && <CareerNavigator />}
         {page === 'roadmap' && <LearningRoadmap />}
         {page === 'dashboard' && <JobDashboard />}
+        {page === 'competitive' && <CompetitiveAnalysis />}
       </main>
 
         <footer className="text-center py-6 text-sm text-slate-400">
-          <p>CareerPath AI v3.0 · 火山引擎 ARK · TRAE SOLO Challenge 2026 · 命题③</p>
+          <p>CareerPath AI v3.1 · 火山引擎 ARK · TRAE SOLO Challenge 2026 · 命题③</p>
         </footer>
       </div>
     </AppProvider>
@@ -103,7 +106,7 @@ function HomePage({ onNavigate }) {
       </div>
       
       {/* 新增功能入口 */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto mb-12">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 max-w-5xl mx-auto mb-12">
         <button onClick={() => onNavigate('haic')}
           className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition text-center">
           <div className="text-2xl mb-2">🧠</div>
@@ -123,6 +126,12 @@ function HomePage({ onNavigate }) {
           className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition text-center">
           <div className="text-2xl mb-2">📚</div>
           <div className="font-semibold text-slate-700 text-sm">学习路线</div>
+        </button>
+        <button onClick={() => onNavigate('competitive')}
+          className="bg-white p-4 rounded-xl shadow-sm border-2 border-amber-300 bg-amber-50 hover:shadow-md transition text-center">
+          <div className="text-2xl mb-2">📊</div>
+          <div className="font-semibold text-slate-700 text-sm">竞品分析</div>
+          <div className="text-xs text-amber-600 font-medium mt-0.5">SOLO 协同生成</div>
         </button>
       </div>
       
