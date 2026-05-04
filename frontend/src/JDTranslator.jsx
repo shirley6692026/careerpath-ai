@@ -34,11 +34,11 @@ export default function JDTranslator() {
   const [ocrText, setOcrText] = useState('');
   const [showOcr, setShowOcr] = useState(false);
   const [dragOver, setDragOver] = useState(false);
-  const { state: appState, updateState } = useAppContext();
+  const { jdData, updateJdData } = useAppContext();
   // 从全局Context预填共享JD
   useEffect(() => {
-    if (appState.sharedJobJd && !jdText) {
-      setJdText(appState.sharedJobJd);
+    if (jdData.text && !jdText) {
+      setJdText(jdData.text);
     }
   }, []);
 
@@ -51,7 +51,7 @@ export default function JDTranslator() {
       const res = await jdTranslate(textToAnalyze);
       if (res.success) {
         setResult(res);
-        updateState('jdAnalysis', res);
+        updateJdData({ translated: res.data });
       } else {
         setError(res.error || '分析失败，请重试');
       }

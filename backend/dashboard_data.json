@@ -1,0 +1,65 @@
+{
+  "applications": [
+    {
+      "company": "字节跳动",
+      "position": "前端工程师",
+      "date": "2026-05-01",
+      "salary": "25-35K",
+      "source": "Boss直聘",
+      "status": "applied"
+    },
+    {
+      "company": "阿里巴巴",
+      "position": "Java开发",
+      "date": "2026-05-02",
+      "salary": "20-30K",
+      "source": "内推",
+      "status": "applied"
+    },
+    {
+      "company": "腾讯",
+      "position": "前端工程师",
+      "date": "2026-05-03",
+      "salary": "22-32K",
+      "source": "拉勾",
+      "status": "applied"
+    },
+    {
+      "company": "美团",
+      "position": "前端工程师",
+      "date": "2026-05-03",
+      "salary": "28-40K",
+      "source": "猎头",
+      "status": "applied"
+    },
+    {
+      "company": "小红书",
+      "position": "前端工程师",
+      "date": "2026-05-04",
+      "salary": "18-25K",
+      "source": "官网",
+      "status": "applied"
+    }
+  ],
+  "interviews": [
+    {
+      "company": "字节跳动",
+      "stage": "HR面",
+      "date": "2026-05-04"
+    },
+    {
+      "company": "阿里巴巴",
+      "stage": "技术二面",
+      "date": "2026-05-04"
+    }
+  ],
+  "offers": [
+    {
+      "company": "字节跳动",
+      "position": "前端工程师",
+      "salary": "28K*15",
+      "date": "2026-05-04",
+      "accepted": false
+    }
+  ]
+}

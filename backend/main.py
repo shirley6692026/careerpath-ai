@@ -439,5 +439,347 @@ async def interview_preparation(data: dict):
     return {"success": True, "data": parsed or r["data"], "model_used": r["model_used"], "tokens": r["tokens"]}
 
 app.include_router(resume_router)
+# ============ HAIC Coach API ============
+HAIC_PLAN_PROMPT = """你是HAIC(Human-AI Collaboration Index)人机协作指数教练。根据用户的5维评估结果生成个性化提升计划。返回JSON:
+{
+  "summary": "总体评价，基于得分和水平",
+  "strengths": [{"name": "维度名", "score": 80, "analysis": "优势分析"}],
+  "weaknesses": [{"name": "维度名", "score": 30, "priority": "high", "analysis": "为什么弱，影响什么"}],
+  "improvement_plan": [
+    {"dimension": "维度名", "actions": ["具体行动1", "行动2"], "resources": ["资源链接或书籍"], "expected_time": "预计提升时间"}
+  ],
+  "timeline": [{"phase": "阶段名", "duration": "时长", "focus": "重点内容", "hours_per_week": 5}],
+  "career_impact": "HAIC水平对求职的具体影响"
+}
+只返回JSON，不要用```json包裹。"""
+
+@app.post("/api/haic/generate-plan")
+async def haic_generate_plan(data: dict):
+    scores = data.get("scores", {})
+    if not scores:
+        return {"success": False, "error": "缺少评估分数"}
+    
+    dims_text = "\n".join([f"{k}: {v}分" for k, v in scores.items() if k != "total"])
+    total = scores.get("total", 0)
+    
+    r = ark_call([
+        {"role": "system", "content": HAIC_PLAN_PROMPT},
+        {"role": "user", "content": f"HAIC评估结果:\n总分: {total}/100\n各维度:\n{dims_text}\n请生成个性化提升计划。"}
+    ], temp=0.3, max_tokens=4096)
+    
+    if not r["success"]: return {"success": False, "error": r["error"]}
+    parsed = extract_json(r["data"])
+    return {"success": True, "data": parsed or r["data"], "model_used": r.get("model_used"), "tokens": r.get("tokens")}
+
+@app.post("/api/haic/coach-chat")
+async def haic_coach_chat(data: dict):
+    message = data.get("message", "")
+    context = data.get("context", {})
+    
+    if not message.strip():
+        return {"success": False, "error": "消息为空"}
+    
+    system_prompt = """你是HAIC人机协作教练。你只用**提问**来引导，不给建议不说教。
+
+🎯 GROW结构(每轮必用):
+G: 帮用户明确具体目标
+R: 1-10分量表帮用户自评现状
+O: 用提问让用户自己想出3个方案
+W: 以"接下来24小时你会做什么？"收尾
+
+🧠 NLP层次(得分<40启用):
+"你希望成为怎样的AI使用者？"(身份层)
+"优秀AI协作者会怎么做？"(信念层)
+"你过去成功学新技能用了什么方法？"(能力层)
+
+💬 私董会追问:
+"如果我是面试官，看到这个得分..."(角色切换)
+"换个角度，这个弱点可能是什么优势？"(重构)
+
+格式: [共情1句] → [GROW提问2-3个] → [行动承诺1句]
+禁止: 直接给建议、长篇大论、说教
+字数≤150字"""
+    
+    ctx_text = ""
+    if context:
+        ctx_text = f"\n\n用户评估结果: {json.dumps(context, ensure_ascii=False)}"
+    
+    r = ark_call([
+        {"role": "system", "content": system_prompt + ctx_text},
+        {"role": "user", "content": message}
+    ], temp=0.6, max_tokens=1024)
+    
+    if not r["success"]: return {"success": False, "error": r["error"]}
+    return {"success": True, "data": r["data"], "model_used": r.get("model_used"), "tokens": r.get("tokens")}
+
+# ============ Career Navigator API ============
+CAREER_NAV_PROMPT = """你是职业规划专家。根据用户当前技能和目标岗位，生成职业发展导航。返回JSON:
+{
+  "current_level": "当前水平描述",
+  "target_level": "目标水平描述",
+  "path_steps": [
+    {"step": 1, "title": "步骤名称", "duration": "预计时间", "skills_to_acquire": ["技能1"], "milestones": ["里程碑1"], "resources": ["学习资源"]}
+  ],
+  "skill_gap_analysis": {"matched": ["匹配技能"], "missing": ["缺失技能"], "match_rate": 65},
+  "salary_projection": {"current": "15-20K", "target": "25-35K", "growth": "60%"},
+  "industry_insights": ["行业趋势1", "趋势2"],
+  "alternative_paths": ["备选路径1", "路径2"]
+}
+只返回JSON，不要用```json包裹。"""
+
+@app.post("/api/career/navigate")
+async def career_navigate(data: dict):
+    position = data.get("position", "")
+    skills = data.get("skills", "")
+    domain = data.get("domain", "")
+    
+    if not position:
+        return {"success": False, "error": "缺少目标岗位"}
+    
+    r = ark_call([
+        {"role": "system", "content": CAREER_NAV_PROMPT},
+        {"role": "user", "content": f"当前技能: {skills}\n目标岗位: {position}\n行业领域: {domain or '不限'}\n请生成职业发展导航。"}
+    ], temp=0.3, max_tokens=4096)
+    
+    if not r["success"]: return {"success": False, "error": r["error"]}
+    parsed = extract_json(r["data"])
+    return {"success": True, "data": parsed or r["data"], "model_used": r.get("model_used"), "tokens": r.get("tokens")}
+
+# ============ Learning Roadmap API ============
+ROADMAP_PROMPT = """你是学习路径规划专家。根据用户目标岗位和当前技能，生成个性化学习路线。返回JSON:
+{
+  "position": "目标岗位",
+  "overview": "学习概述",
+  "phases": [
+    {
+      "phase": "阶段名称",
+      "duration": "预计时间",
+      "items": [
+        {"name": "技能/知识", "type": "course/book/project", "priority": "high/medium/low", "description": "学习内容描述", "estimated_hours": 20, "resources": ["推荐资源"]}
+      ]
+    }
+  ],
+  "total_duration": "总时长预估",
+  "certifications": ["推荐证书"],
+  "practice_projects": ["实战项目1", "项目2"],
+  "success_metrics": ["衡量标准"]
+}
+只返回JSON，不要用```json包裹。"""
+
+@app.post("/api/career/roadmap")
+async def career_roadmap(data: dict):
+    position = data.get("position", "")
+    skills = data.get("skills", "")
+    
+    if not position:
+        return {"success": False, "error": "缺少目标岗位"}
+    
+    r = ark_call([
+        {"role": "system", "content": ROADMAP_PROMPT},
+        {"role": "user", "content": f"目标岗位: {position}\n当前技能: {skills or '基础水平'}\n请生成详细学习路线。"}
+    ], temp=0.3, max_tokens=4096)
+    
+    if not r["success"]: return {"success": False, "error": r["error"]}
+    parsed = extract_json(r["data"])
+    return {"success": True, "data": parsed or r["data"], "model_used": r.get("model_used"), "tokens": r.get("tokens")}
+
+# ============ Dashboard & Battle Report API ============
+DASHBOARD_FILE = Path("dashboard_data.json")
+
+def load_dashboard():
+    if DASHBOARD_FILE.exists():
+        try: return json.loads(DASHBOARD_FILE.read_text())
+        except: pass
+    return {"applications": [], "interviews": [], "offers": []}
+
+def save_dashboard(data):
+    DASHBOARD_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+
+@app.get("/api/dashboard/stats")
+async def dashboard_stats():
+    d = load_dashboard()
+    apps = d.get("applications", [])
+    interviews = d.get("interviews", [])
+    offers = d.get("offers", [])
+    
+    return {
+        "success": True,
+        "data": {
+            "applications": len(apps),
+            "interviews": len(interviews),
+            "offers": len(offers),
+            "rejection_rate": round((len(apps) - len(interviews)) / max(len(apps), 1) * 100, 1),
+            "interview_rate": round(len(interviews) / max(len(apps), 1) * 100, 1),
+            "offer_rate": round(len(offers) / max(len(interviews), 1) * 100, 1),
+            "recent_apps": apps[-5:][::-1],
+            "active_interviews": [
+                {"company": i.get("company"), "stage": i.get("stage"), "date": i.get("date")}
+                for i in interviews if i.get("stage") not in ("offer", "rejected")
+            ]
+        }
+    }
+
+@app.post("/api/dashboard/update")
+async def dashboard_update(data: dict):
+    action = data.get("action")
+    record = data.get("record", {})
+    
+    d = load_dashboard()
+    
+    if action == "add_application":
+        d.setdefault("applications", []).append({
+            "company": record.get("company", "未知"),
+            "position": record.get("position", ""),
+            "date": record.get("date", ""),
+            "source": record.get("source", ""),
+            "status": "applied"
+        })
+    elif action == "add_interview":
+        d.setdefault("interviews", []).append({
+            "company": record.get("company", "未知"),
+            "stage": record.get("stage", "初面"),
+            "date": record.get("date", ""),
+            "notes": record.get("notes", "")
+        })
+    elif action == "add_offer":
+        d.setdefault("offers", []).append({
+            "company": record.get("company", "未知"),
+            "position": record.get("position", ""),
+            "salary": record.get("salary", ""),
+            "date": record.get("date", ""),
+            "accepted": False
+        })
+    
+    save_dashboard(d)
+    
+    # Generate AI insight
+    apps = d.get("applications", [])
+    interviews = d.get("interviews", [])
+    insight_prompt = f"""用户在求职中: 投递{len(apps)}次，面试{len(interviews)}次。作为求职导师，给一条鼓励性但实用的建议，20字以内。"""
+    
+    r = ark_call([
+        {"role": "system", "content": "你是求职导师，回复简洁（20字内）、鼓舞、有实用性。"},
+        {"role": "user", "content": insight_prompt}
+    ], temp=0.6, max_tokens=200)
+    
+    insight = r.get("data", "坚持就是胜利，优化简历提升转化率！") if r["success"] else "持续努力，好机会在路上！"
+    
+    return {"success": True, "data": {"message": "更新成功", "insight": insight}}
+
+
+@app.get("/api/salary/map")
+async def salary_map():
+    d = load_dashboard()
+    apps = d.get("applications", [])
+    offers = d.get("offers", [])
+    
+    # Aggregate salary data from applications with salary info
+    salary_data = []
+    for a in apps:
+        if a.get("salary"):
+            salary_data.append({"company": a["company"], "position": a.get("position", ""), "salary": a["salary"]})
+    
+    # Add offer salary data
+    for o in offers:
+        if o.get("salary"):
+            salary_data.append({"company": o["company"], "position": o.get("position", ""), "salary": o["salary"], "type": "offer"})
+    
+    # Generate AI-powered salary insight if we have data
+    insight = ""
+    if len(salary_data) > 0:
+        prompt = f"基于以下求职薪资数据，用一句话(30字内)简洁分析薪资趋势：{json.dumps([s['salary'] for s in salary_data])}"
+        r = ark_call([
+            {"role": "system", "content": "你是薪资分析师，回复极度简洁，30字以内"},
+            {"role": "user", "content": prompt}
+        ], temp=0.6, max_tokens=200)
+        insight = r.get("data", "") if r["success"] else ""
+    
+    # Position-based salary ranges (from stored data + general market)
+    position_salaries = {}
+    for s in salary_data:
+        pos = s.get("position", "其他")
+        if pos not in position_salaries:
+            position_salaries[pos] = []
+        position_salaries[pos].append(s["salary"])
+    
+    position_stats = []
+    for pos, sals in position_salaries.items():
+        try:
+            nums = []
+            for s in sals:
+                # Extract number from salary string like "15-20K" or "20K"
+                import re
+                nums_raw = re.findall(r'\d+', str(s))
+                if nums_raw:
+                    nums.extend([float(n) for n in nums_raw])
+            if nums:
+                position_stats.append({
+                    "position": pos,
+                    "min": round(min(nums), 1),
+                    "max": round(max(nums), 1),
+                    "avg": round(sum(nums)/len(nums), 1),
+                    "count": len(sals)
+                })
+        except:
+            pass
+    
+    return {
+        "success": True,
+        "data": {
+            "salary_records": salary_data,
+            "position_stats": position_stats,
+            "insight": insight,
+            "total_records": len(salary_data)
+        }
+    }
+
+@app.get("/api/battlereport")
+async def battlereport():
+    d = load_dashboard()
+    apps = d.get("applications", [])
+    interviews = d.get("interviews", [])
+    offers = d.get("offers", [])
+    
+    # Calculate weekly trends
+    from collections import defaultdict
+    from datetime import datetime, timedelta
+    
+    weekly = defaultdict(lambda: {"applications": 0, "interviews": 0})
+    for a in apps:
+        try: 
+            dt = datetime.fromisoformat(a.get("date", ""))
+            week_key = dt.strftime("%Y-W%W")
+            weekly[week_key]["applications"] += 1
+        except: pass
+    for iv in interviews:
+        try:
+            dt = datetime.fromisoformat(iv.get("date", ""))
+            week_key = dt.strftime("%Y-W%W")
+            weekly[week_key]["interviews"] += 1
+        except: pass
+    
+    weekly_sorted = sorted(weekly.items())[-4:]  # Last 4 weeks
+    
+    return {
+        "success": True,
+        "data": {
+            "total_applications": len(apps),
+            "total_interviews": len(interviews),
+            "total_offers": len(offers),
+            "pending": len(apps) - len(interviews) - len(offers),
+            "weekly_trends": [
+                {"week": w, "applications": d["applications"], "interviews": d["interviews"]}
+                for w, d in weekly_sorted
+            ],
+            "active_interviews": [
+                {"company": i.get("company"), "stage": i.get("stage"), "progress": 60 if i.get("stage") == "HR面" else 80 if "二面" in i.get("stage", "") else 20}
+                for i in interviews if i.get("stage") not in ("offer", "rejected")
+            ][-5:]
+        }
+    }
+
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+

@@ -10,11 +10,11 @@ export default function SkillRadar() {
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const { state: appState, updateState } = useAppContext();
+  const { userProfile, updateUserProfile } = useAppContext();
   // 从全局Context预填共享信息
   useEffect(() => {
-    if (appState.sharedTargetJob && !targetJob) {
-      setTargetJob(appState.sharedTargetJob);
+    if (userProfile.targetJob && !targetJob) {
+      setTargetJob(userProfile.targetJob);
     }
   }, []);
 

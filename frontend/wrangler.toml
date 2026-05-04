@@ -1,0 +1,9 @@
+# CareerPath AI v3.1 - Cloudflare Pages Deployment
+name = "careerpath-ai"
+compatibility_date = "2026-05-04"
+
+# Pages project config
+pages_build_output_dir = "dist"
+
+[env.production]
+name = "careerpath-ai"

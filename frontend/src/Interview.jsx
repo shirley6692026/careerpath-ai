@@ -57,17 +57,17 @@ export default function Interview() {
   const [showSummary, setShowSummary] = useState(false);
   const [summary, setSummary] = useState(null);
   const [summaryLoading, setSummaryLoading] = useState(false);
-  const { state: appState, updateState } = useAppContext();
+  const { userProfile, resumeData, updateUserProfile } = useAppContext();
   // 从全局Context预填共享信息
   useEffect(() => {
-    if (appState.sharedTargetJob && !position) {
-      setPosition(appState.sharedTargetJob);
+    if (userProfile.targetJob && !position) {
+      setPosition(userProfile.targetJob);
     }
-    if (appState.resume.text && !resumeText) {
-      setResumeText(appState.resume.text);
+    if (resumeData.text && !resumeText) {
+      setResumeText(resumeData.text);
     }
-    if (appState.resume.parsed?.skills?.text && !skills) {
-      setSkills(appState.resume.parsed.skills.text);
+    if (resumeData.parsed?.skills?.text && !skills) {
+      setSkills(resumeData.parsed.skills.text);
     }
   }, []);
 

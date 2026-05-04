@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { API_BASE } from './services/api';
 import { useAppContext } from './context/AppContext';
 
 // HAIC教练 v2.5 - 稳定版
@@ -178,6 +179,69 @@ export default function HAICCoach() {
     }
   };
 
+
+// SVG Radar Chart component
+function RadarChart({ scores, dimensions }) {
+  const size = 220;
+  const center = size / 2;
+  const radius = 85;
+  const levels = 5;
+  const angleStep = (2 * Math.PI) / dimensions.length;
+  
+  const getPoint = (value, index) => {
+    const angle = angleStep * index - Math.PI / 2;
+    const r = (value / 100) * radius;
+    return { x: center + r * Math.cos(angle), y: center + r * Math.sin(angle) };
+  };
+  
+  const gridPoints = Array.from({ length: levels }, (_, level) => {
+    const r = ((level + 1) / levels) * radius;
+    return dimensions.map((_, i) => {
+      const angle = angleStep * i - Math.PI / 2;
+      return `${center + r * Math.cos(angle)},${center + r * Math.sin(angle)}`;
+    }).join(' ');
+  });
+  
+  const dataPoints = dimensions.map((dim, i) => {
+    const score = scores[dim.id] || 0;
+    const pt = getPoint(score, i);
+    return `${pt.x},${pt.y}`;
+  }).join(' ');
+  
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="mx-auto">
+      {/* Grid */}
+      {gridPoints.map((points, i) => (
+        <polygon key={`grid-${i}`} points={points} fill="none" stroke="#e2e8f0" strokeWidth="1" />
+      ))}
+      {/* Axes */}
+      {dimensions.map((_, i) => {
+        const pt = getPoint(100, i);
+        return <line key={`axis-${i}`} x1={center} y1={center} x2={pt.x} y2={pt.y} stroke="#cbd5e1" strokeWidth="1" />;
+      })}
+      {/* Data */}
+      <polygon points={dataPoints} fill="rgba(59, 130, 246, 0.2)" stroke="#3b82f6" strokeWidth="2" />
+      {/* Dots */}
+      {dimensions.map((dim, i) => {
+        const score = scores[dim.id] || 0;
+        const pt = getPoint(score, i);
+        return <circle key={`dot-${i}`} cx={pt.x} cy={pt.y} r="4" fill={dim.color || '#3b82f6'} stroke="white" strokeWidth="2" />;
+      })}
+      {/* Labels */}
+      {dimensions.map((dim, i) => {
+        const pt = getPoint(115, i);
+        return (
+          <text key={`label-${i}`} x={pt.x} y={pt.y} textAnchor="middle" dominantBaseline="middle"
+            fontSize="11" fontWeight="600" fill="#475569">
+            <tspan x={pt.x} dy="-0.3em">{dim.name.slice(0,2)}</tspan>
+            <tspan x={pt.x} dy="1.3em" fontSize="9" fill="#94a3b8">{scores[dim.id]||0}分</tspan>
+          </text>
+        );
+      })}
+    </svg>
+  );
+}
+
   const getLevel = (score) => {
     if (score >= 81) return { level: 'L5 大师', desc: '能指导他人进行人机协作', color: '#8B5CF6' };
     if (score >= 61) return { level: 'L4 精通', desc: '能设计人机协作流程', color: '#3B82F6' };
@@ -246,29 +310,32 @@ export default function HAICCoach() {
     }, 1000);
   };
 
-  const generatePersonalizedPlan = () => {
-    const weakDims = HAIC_DIMENSIONS.filter(d => (scores[d.id] || 0) < 60);
-    const strongDims = HAIC_DIMENSIONS.filter(d => (scores[d.id] || 0) >= 80);
-    
-    const plan = {
-      summary: `你的HAIC总分为${scores.total || 0}分，处于${getLevel(scores.total || 0).level}水平。`,
-      strengths: strongDims.map(d => ({ name: d.name, score: scores[d.id] || 0 })),
-      improvements: weakDims.map(d => ({
-        name: d.name,
-        score: scores[d.id] || 0,
-        priority: d.weight >= 20 ? '高' : '中',
-        actions: [`完成${d.name}的专项训练`, '阅读推荐学习资源', '与AI教练对话深入理解'],
-        resources: [`📚 ${d.name}学习指南`, `🎯 专项练习题`, `💬 AI教练一对一辅导`]
-      })),
-      timeline: [
-        { phase: '第1周', focus: '薄弱维度基础学习', hours: 5 },
-        { phase: '第2-3周', focus: '专项训练+实践', hours: 10 },
-        { phase: '第4周', focus: '综合测试+调整', hours: 3 }
-      ],
-      weeklyGoal: '每周至少完成2次专项训练，与AI教练对话1次'
-    };
-    
-    setPersonalizedPlan(plan);
+  const generatePersonalizedPlan = async () => {
+    setCoachLoading(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/haic/generate-plan`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scores })
+      });
+      const json = await res.json();
+      if (json.success && json.data) {
+        const plan = {
+          summary: json.data.summary || `你的HAIC总分为${scores.total || 0}分`,
+          strengths: json.data.strengths || [],
+          improvements: (json.data.weaknesses || []).map(w => ({...w, priority: w.priority === 'high' ? '高' : '中'})),
+          timeline: json.data.timeline || [],
+          improvement_plan: json.data.improvement_plan || [],
+          weeklyGoal: '每周至少完成2次专项训练，与AI教练对话1次'
+        };
+        setPersonalizedPlan(plan);
+      } else {
+        setPersonalizedPlan({ summary: '生成失败，请重试', strengths: [], improvements: [], timeline: [] });
+      }
+    } catch {
+      setPersonalizedPlan({ summary: '网络连接失败', strengths: [], improvements: [], timeline: [] });
+    }
+    setCoachLoading(false);
     setShowPlan(true);
   };
 
@@ -657,7 +724,9 @@ export default function HAICCoach() {
                   <div className="mb-6">
                     <h3 className="font-bold text-gray-800 mb-3">🎯 提升重点</h3>
                     <div className="space-y-4">
-                      {personalizedPlan.improvements.map((imp, i) => (
+                      {personalizedPlan.improvements.map((imp, i) => {
+                        const planItem = (personalizedPlan.improvement_plan || []).find(p => p.dimension === imp.name);
+                        return (
                         <div key={i} className="border rounded-lg p-4">
                           <div className="flex items-center justify-between mb-2">
                             <div className="font-medium">{imp.name} ({imp.score}分)</div>
@@ -667,11 +736,12 @@ export default function HAICCoach() {
                               {imp.priority}优先级
                             </span>
                           </div>
+                          {imp.analysis && <p className="text-sm text-gray-500 mb-2">{imp.analysis}</p>}
                           <div className="grid md:grid-cols-2 gap-3">
                             <div>
                               <div className="text-sm font-medium text-gray-600 mb-1">行动计划</div>
                               <ul className="space-y-1">
-                                {imp.actions.map((a, j) => (
+                                {(planItem?.actions || ['完成专项训练', '阅读学习资源', '与AI教练对话']).map((a, j) => (
                                   <li key={j} className="text-sm text-gray-600 flex items-start gap-1">
                                     <span>•</span> {a}
                                   </li>
@@ -681,7 +751,7 @@ export default function HAICCoach() {
                             <div>
                               <div className="text-sm font-medium text-gray-600 mb-1">学习资源</div>
                               <ul className="space-y-1">
-                                {imp.resources.map((r, j) => (
+                                {(planItem?.resources || ['专项学习指南', '在线课程', 'AI教练辅导']).map((r, j) => (
                                   <li key={j} className="text-sm text-gray-600">{r}</li>
                                 ))}
                               </ul>
@@ -694,7 +764,7 @@ export default function HAICCoach() {
                             🚀 开始专项训练
                           </button>
                         </div>
-                      ))}
+                      )})}
                     </div>
                   </div>
                 )}
@@ -706,7 +776,7 @@ export default function HAICCoach() {
                       <div key={i} className="flex items-center gap-4 bg-gray-50 rounded-lg p-3">
                         <div className="w-20 font-medium text-gray-700">{t.phase}</div>
                         <div className="flex-1 text-gray-600">{t.focus}</div>
-                        <div className="text-sm text-gray-500">{t.hours}小时</div>
+                        <div className="text-sm text-gray-500">{t.hours_per_week || t.hours}小时/周</div>
                       </div>
                     ))}
                   </div>
