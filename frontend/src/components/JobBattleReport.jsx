@@ -1,8 +1,11 @@
+import { useAppContext } from '../context/AppContext';
 // 求职战报组件 - v3.1 with Salary Map
 import { useState, useEffect } from 'react';
 import { API_BASE } from '../services/api';
 
 export default function JobBattleReport() {
+  const { interviewData, userProfile } = useAppContext();
+
   const [stats, setStats] = useState(null);
   const [salaryData, setSalaryData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -46,6 +49,7 @@ export default function JobBattleReport() {
   const barMax = Math.max((stats?.total_applications || 0) * 1.2, 10);
 
   return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
     <div className="max-w-4xl mx-auto p-6 animate-fadeIn">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold text-slate-900">📊 求职战报</h2>
@@ -165,6 +169,11 @@ export default function JobBattleReport() {
           <p className="text-sm">点击「+ 新投递」开始记录你的求职进展</p>
         </div>
       )}
+    </div>
+    </div>
+        </div>
+    </div>
+    </div>
     </div>
   );
 }

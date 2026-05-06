@@ -1,8 +1,11 @@
+import { useAppContext } from '../context/AppContext';
 // 求职仪表盘组件 - v2.0 with Real API
 import { useState, useEffect } from 'react';
 import { API_BASE } from '../services/api';
 
 export default function JobDashboard() {
+  const { resumeData, interviewData, skillRadarData, userProfile } = useAppContext();
+
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [insight, setInsight] = useState('');
@@ -32,7 +35,7 @@ export default function JobDashboard() {
   const stats = data || { applications: 0, interviews: 0, offers: 0, rejection_rate: 0, interview_rate: 0, offer_rate: 0, recent_apps: [], active_interviews: [] };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50"><div className="max-w-4xl mx-auto p-6">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">📈 求职仪表盘</h2>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
@@ -104,5 +107,6 @@ export default function JobDashboard() {
         </div>
       )}
     </div>
+      </div>
   );
 }

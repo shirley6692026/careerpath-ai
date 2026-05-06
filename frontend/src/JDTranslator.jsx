@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
+import { useAutoSave } from './hooks/useAutoSave';
 import { useAppContext } from './context/AppContext';
 import { jdTranslate, jdFromImage } from './services/api';
 
@@ -98,7 +99,7 @@ export default function JDTranslator() {
   const isJson = d && typeof d === 'object' && !Array.isArray(d) && d.daily_work;
 
   return (
-    <div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-slate-800">📄 JD 翻译官</h2>
         <p className="text-slate-500 mt-1">粘贴文字 或 上传截图 → AI分析企业真实需求</p>
@@ -106,7 +107,7 @@ export default function JDTranslator() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Input Panel */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
           {/* Image Upload Zone */}
           <div
             onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
@@ -114,7 +115,7 @@ export default function JDTranslator() {
             onDrop={handleDrop}
             onClick={() => document.getElementById('imgInput')?.click()}
             className={`border-2 border-dashed rounded-xl p-5 text-center cursor-pointer transition-all mb-4 ${
-              dragOver ? 'border-blue-500 bg-blue-50 scale-[1.02]' : 'border-slate-200 hover:border-blue-300 hover:bg-slate-50'
+              dragOver ? 'border-blue-500 bg-blue-50 scale-[1.02]' : 'border-slate-100 hover:border-blue-300 hover:bg-slate-50'
             }`}
           >
             <input id="imgInput" type="file" accept="image/*" className="hidden"
@@ -148,7 +149,7 @@ export default function JDTranslator() {
             }}
             placeholder="粘贴招聘 JD 文本..."
             className={`w-full h-44 p-4 border rounded-lg resize-none focus:outline-none transition-all text-sm ${
-              showOcr ? 'border-green-300 bg-green-50 focus:ring-2 focus:ring-green-500' : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
+              showOcr ? 'border-green-300 bg-green-50 focus:ring-2 focus:ring-green-500' : 'border-slate-100 focus:ring-2 focus:ring-blue-500'
             }`}
           />
 
@@ -197,7 +198,7 @@ export default function JDTranslator() {
         </div>
 
         {/* Output Panel */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
           <h3 className="font-semibold text-slate-700 mb-4">📊 分析结果</h3>
           
           {!result && !loading && (

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useAutoSave } from './hooks/useAutoSave';
 import { API_BASE } from './services/api';
 import { useAppContext } from './context/AppContext';
 
@@ -239,6 +240,13 @@ function RadarChart({ scores, dimensions }) {
         );
       })}
     </svg>
+      </div>
+    </div>
+    </div>
+    </div>
+    </div>
+    </div>
+    </div>
   );
 }
 
@@ -261,30 +269,51 @@ function RadarChart({ scores, dimensions }) {
   <meta charset="UTF-8">
   <title>HAIC能力证书</title>
   <style>
-    body { font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; margin: 0; }
-    .cert { width: 800px; margin: 20px auto; padding: 60px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 20px; text-align: center; }
-    .title { font-size: 36px; margin-bottom: 30px; }
-    .score { font-size: 72px; margin: 20px 0; }
-    .level { font-size: 24px; margin-bottom: 40px; }
-    .dimensions { display: flex; justify-content: space-around; margin: 30px 0; }
-    .dim { text-align: center; }
-    .dim-score { font-size: 36px; }
-    .footer { margin-top: 40px; font-size: 14px; opacity: 0.8; }
+    body { font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif; margin: 0; background: #f5f5f5; }
+    .cert-container { width: 800px; margin: 20px auto; padding: 60px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 20px; text-align: center; box-shadow: 0 10px 40px rgba(0,0,0,0.2); }
+    .cert-title { font-size: 36px; margin-bottom: 10px; font-weight: bold; }
+    .cert-subtitle { font-size: 18px; margin-bottom: 30px; opacity: 0.9; }
+    .cert-score { font-size: 96px; margin: 20px 0; font-weight: bold; text-shadow: 2px 2px 4px rgba(0,0,0,0.2); }
+    .cert-level { font-size: 28px; margin-bottom: 20px; padding: 10px 30px; background: rgba(255,255,255,0.2); border-radius: 30px; display: inline-block; }
+    .cert-dimensions { display: flex; justify-content: space-around; margin: 40px 0; flex-wrap: wrap; gap: 20px; }
+    .cert-dim { text-align: center; background: rgba(255,255,255,0.15); padding: 15px 25px; border-radius: 15px; min-width: 120px; }
+    .cert-dim-name { font-size: 14px; margin-bottom: 8px; opacity: 0.9; }
+    .cert-dim-score { font-size: 32px; font-weight: bold; }
+    .cert-footer { margin-top: 40px; font-size: 14px; opacity: 0.8; border-top: 1px solid rgba(255,255,255,0.3); padding-top: 20px; }
+    .cert-id { font-size: 12px; opacity: 0.6; margin-top: 10px; }
+    @media print { body { background: white; } .cert-container { box-shadow: none; margin: 0; } }
   </style>
 </head>
 <body>
-  <div class="cert">
-    <div class="title">🏆 HAIC 人机协作指数证书</div>
-    <div class="score">${totalScore}</div>
-    <div class="level">${level.level} · ${level.desc}</div>
-    <div class="footer">CareerPath AI · ${new Date().toLocaleDateString('zh-CN')}</div>
+  <div class="cert-container">
+    <div class="cert-title">🏆 HAIC 人机协作指数证书</div>
+    <div class="cert-subtitle">Human-AI Collaboration Index Certificate</div>
+    <div class="cert-score">${totalScore}<span style="font-size:24px">/100</span></div>
+    <div class="cert-level">${level.level} · ${level.desc}</div>
+    <div class="cert-dimensions">
+      ${Object.entries(scores).filter(([k]) => k !== 'total').map(([k, v]) => {
+        const dim = HAIC_DIMENSIONS.find(d => d.id === k);
+        return `<div class="cert-dim"><div class="cert-dim-name">${dim?.icon || '📊'} ${dim?.name || k}</div><div class="cert-dim-score">${v}</div></div>`;
+      }).join('')}
+    </div>
+    <div class="cert-footer">
+      <div>CareerPath AI · 颁发日期: ${new Date().toLocaleDateString('zh-CN')}</div>
+      <div class="cert-id">证书编号: HAIC-${Date.now().toString(36).toUpperCase()}</div>
+    </div>
+  </div>
+  <div style="text-align: center; margin: 20px;">
+    <button onclick="window.print()" style="padding: 10px 30px; font-size: 16px; background: #667eea; color: white; border: none; border-radius: 8px; cursor: pointer;">🖨️ 打印/保存证书</button>
   </div>
 </body>
 </html>`;
     
-    const win = window.open('', '_blank');
-    win.document.write(certHTML);
-    win.document.close();
+    // 使用Blob创建可打印的证书页面
+    const blob = new Blob([certHTML], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const win = window.open(url, '_blank', 'width=900,height=700');
+    if (!win) {
+      alert('请允许弹出窗口以查看证书');
+    }
   };
 
   const startCoach = () => {
@@ -300,43 +329,172 @@ function RadarChart({ scores, dimensions }) {
     setCoachLoading(true);
     setCoachMessages(prev => [...prev, { role: 'user', content: message }]);
     
-    setTimeout(() => {
+    try {
+      // 构建上下文 - 包含HAIC评估结果
+      const context = {
+        scores: scores,
+        total: scores.total || 0,
+        level: getLevel(scores.total || 0),
+        dimensions: HAIC_DIMENSIONS.map(d => ({
+          name: d.name,
+          score: scores[d.id] || 0,
+          description: d.description
+        }))
+      };
+      
+      // 调用后端AI教练API
+      const res = await fetch(`${API_BASE}/api/haic/coach-chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: message,
+          context: context,
+          history: coachMessages.slice(-10) // 最近10条作为上下文
+        })
+      });
+      
+      if (!res.ok) {
+        throw new Error(`HTTP ${res.status}`);
+      }
+      
+      const json = await res.json();
+      
+      if (json.success && json.data?.response) {
+        setCoachMessages(prev => [...prev, {
+          role: 'assistant',
+          content: json.data.response
+        }]);
+      } else {
+        throw new Error(json.error || 'AI响应失败');
+      }
+    } catch (err) {
+      console.error('[HAIC Coach] API调用失败:', err);
+      
+      // Fallback: 基于关键词的简单回复
+      const fallbackResponse = generateCoachFallback(message, scores);
       setCoachMessages(prev => [...prev, {
         role: 'assistant',
-        content: `关于"${message}"，我的建议是：\n\n1. 理解核心概念：先确保你理解这个能力维度的定义\n2. 实践练习：通过实际工作场景来锻炼\n3. 持续反馈：定期评估自己的进步\n\n你想深入了解哪个方面？`
+        content: fallbackResponse
       }]);
+    } finally {
       setCoachLoading(false);
       setCoachInput('');
-    }, 1000);
+    }
+  };
+  
+  // AI教练Fallback回复生成
+  const generateCoachFallback = (message, scores) => {
+    const lowerMsg = message.toLowerCase();
+    const total = scores.total || 0;
+    
+    // 识别关键词
+    const keywords = {
+      '提升': '建议从你最弱的维度开始，每天花30分钟专项练习',
+      '学习': '推荐结合理论学习和实践项目，效率最高',
+      '工作': '在工作中主动寻找使用AI的机会，比如自动化重复任务',
+      '面试': '面试时可以强调你的人机协作经验，这是差异化优势',
+      'prompt': '提示工程的关键是：角色设定+具体目标+输出格式+约束条件',
+      '伦理': 'AI伦理三原则：透明、公平、负责任',
+      '总分': `你的HAIC总分是${total}分，${total >= 80 ? '非常优秀！' : total >= 60 ? '有良好基础' : '还有很大提升空间'}`,
+      '怎么': '建议制定具体的学习计划，分阶段提升各个维度',
+      '为什么': 'HAIC评估的是AI时代核心竞争力，企业越来越看重这个',
+      '帮助': '我可以帮你：1)分析弱项 2)制定计划 3)推荐资源 4)解答问题'
+    };
+    
+    // 匹配关键词
+    for (const [key, response] of Object.entries(keywords)) {
+      if (lowerMsg.includes(key)) {
+        return response;
+      }
+    }
+    
+    // 默认回复
+    return `感谢你的提问！关于"${message}"，作为你的HAIC AI教练，我建议：\n\n1. 先回顾一下你的HAIC评估结果，找出相关维度\n2. 针对具体场景进行练习\n3. 有任何问题随时问我\n\n你想深入了解哪个方面？`;
   };
 
   const generatePersonalizedPlan = async () => {
     setCoachLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/haic/generate-plan`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scores })
-      });
-      const json = await res.json();
-      if (json.success && json.data) {
-        const plan = {
-          summary: json.data.summary || `你的HAIC总分为${scores.total || 0}分`,
-          strengths: json.data.strengths || [],
-          improvements: (json.data.weaknesses || []).map(w => ({...w, priority: w.priority === 'high' ? '高' : '中'})),
-          timeline: json.data.timeline || [],
-          improvement_plan: json.data.improvement_plan || [],
-          weeklyGoal: '每周至少完成2次专项训练，与AI教练对话1次'
-        };
-        setPersonalizedPlan(plan);
-      } else {
-        setPersonalizedPlan({ summary: '生成失败，请重试', strengths: [], improvements: [], timeline: [] });
+    let retries = 2;
+    
+    while (retries >= 0) {
+      try {
+        const res = await fetch(`${API_BASE}/api/haic/generate-plan`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ scores })
+        });
+        
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+        }
+        
+        const json = await res.json();
+        
+        if (json.success && json.data) {
+          const plan = {
+            summary: json.data.summary || `你的HAIC总分为${scores.total || 0}分`,
+            strengths: json.data.strengths || [],
+            improvements: (json.data.weaknesses || []).map(w => ({...w, priority: w.priority === 'high' ? '高' : '中'})),
+            timeline: json.data.timeline || [],
+            improvement_plan: json.data.improvement_plan || [],
+            weeklyGoal: '每周至少完成2次专项训练，与AI教练对话1次'
+          };
+          setPersonalizedPlan(plan);
+          setCoachLoading(false);
+          setShowPlan(true);
+          return;
+        } else {
+          throw new Error(json.error || '生成计划失败');
+        }
+      } catch (err) {
+        console.error(`[HAIC] 生成计划失败 (剩余重试${retries}):`, err);
+        retries--;
+        if (retries < 0) {
+          // 使用本地生成作为fallback
+          const fallbackPlan = generateLocalPlan(scores);
+          setPersonalizedPlan(fallbackPlan);
+          setCoachLoading(false);
+          setShowPlan(true);
+          return;
+        }
+        // 等待1秒后重试
+        await new Promise(r => setTimeout(r, 1000));
       }
-    } catch {
-      setPersonalizedPlan({ summary: '网络连接失败', strengths: [], improvements: [], timeline: [] });
     }
-    setCoachLoading(false);
-    setShowPlan(true);
+  };
+  
+  // 本地生成fallback计划
+  const generateLocalPlan = (scores) => {
+    const total = scores.total || 0;
+    const dimensions = Object.entries(scores).filter(([k]) => k !== 'total');
+    const sorted = dimensions.sort((a, b) => a[1] - b[1]);
+    
+    return {
+      summary: `你的HAIC总分为${total}分。${total >= 80 ? '表现优秀！' : total >= 60 ? '有良好基础，继续提升！' : '有较大提升空间，加油！'}`,
+      strengths: dimensions.filter(([_, v]) => v >= 75).map(([k, v]) => {
+        const dim = HAIC_DIMENSIONS.find(d => d.id === k);
+        return { name: dim?.name || k, score: v, analysis: `${dim?.name || k}表现良好` };
+      }),
+      improvements: sorted.slice(0, 3).map(([k, v]) => {
+        const dim = HAIC_DIMENSIONS.find(d => d.id === k);
+        return { name: dim?.name || k, score: v, priority: v < 60 ? '高' : '中', analysis: `${dim?.name || k}需要加强` };
+      }),
+      timeline: [
+        { phase: '第一阶段', duration: '1-2周', focus: '强化最弱维度', hours_per_week: 5 },
+        { phase: '第二阶段', duration: '3-4周', focus: '全面提升', hours_per_week: 4 },
+        { phase: '第三阶段', duration: '持续', focus: '巩固优势', hours_per_week: 3 }
+      ],
+      improvement_plan: sorted.slice(0, 2).map(([k, _]) => {
+        const dim = HAIC_DIMENSIONS.find(d => d.id === k);
+        return {
+          dimension: dim?.name || k,
+          actions: ['完成专项训练', '阅读学习材料', '与AI教练对话'],
+          resources: ['在线课程', '实践项目'],
+          expected_time: '2-4周'
+        };
+      }),
+      weeklyGoal: '每周完成2次专项训练，与AI教练对话1次'
+    };
   };
 
   const startTraining = (dimensionId) => {
@@ -375,7 +533,7 @@ function RadarChart({ scores, dimensions }) {
   // ========== 介绍页面 ==========
   if (step === 'intro') {
     return (
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50"><div className="max-w-4xl mx-auto p-6">
         <div className="text-center mb-8">
           <div className="text-6xl mb-4">🧠🤖</div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">HAIC 人机协作指数</h1>
@@ -391,7 +549,7 @@ function RadarChart({ scores, dimensions }) {
           </p>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {HAIC_DIMENSIONS.map(dim => (
-              <div key={dim.id} className="bg-white rounded-lg p-4 text-center shadow-sm">
+              <div key={dim.id} className="bg-white rounded-xl p-4 text-center shadow-sm">
                 <div className="text-3xl mb-2">{dim.icon}</div>
                 <div className="font-medium text-sm" style={{ color: dim.color }}>{dim.name}</div>
                 <div className="text-xs text-gray-500 mt-1">{dim.weight}%</div>
@@ -402,7 +560,7 @@ function RadarChart({ scores, dimensions }) {
 
         <div className="grid md:grid-cols-2 gap-6 mb-8">
           {HAIC_DIMENSIONS.map(dim => (
-            <div key={dim.id} className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
+            <div key={dim.id} className="bg-white rounded-xl p-5 shadow-sm border border-slate-100">
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-2xl">{dim.icon}</span>
                 <div>
@@ -450,7 +608,7 @@ function RadarChart({ scores, dimensions }) {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-6">
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100 mb-6">
           <div className="text-lg font-medium text-gray-800 mb-6">
             {currentQ + 1}. {q.q}
           </div>
@@ -502,7 +660,7 @@ function RadarChart({ scores, dimensions }) {
     const level = getLevel(totalScore);
 
     return (
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50"><div className="max-w-4xl mx-auto p-6">
         {/* 标题 */}
         <div className="text-center mb-8">
           <div className="text-5xl mb-4">🎉</div>
@@ -520,7 +678,7 @@ function RadarChart({ scores, dimensions }) {
         </div>
 
         {/* 雷达图 */}
-        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-8">
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-slate-100 mb-8">
           <h3 className="text-lg font-bold text-gray-800 mb-4">五维能力雷达</h3>
           <div className="grid grid-cols-5 gap-4">
             {HAIC_DIMENSIONS.map(dim => {
@@ -556,7 +714,7 @@ function RadarChart({ scores, dimensions }) {
           {HAIC_DIMENSIONS.map(dim => {
             const score = scores[dim.id] || 0;
             return (
-              <div key={dim.id} className="bg-white rounded-lg p-4 shadow-sm border border-gray-100">
+              <div key={dim.id} className="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span>{dim.icon}</span>
@@ -703,7 +861,7 @@ function RadarChart({ scores, dimensions }) {
                   </button>
                 </div>
                 
-                <div className="bg-blue-50 rounded-lg p-4 mb-6">
+                <div className="bg-blue-50 rounded-xl p-4 mb-6">
                   <p className="text-blue-800 font-medium">{personalizedPlan.summary}</p>
                 </div>
                 
@@ -727,7 +885,7 @@ function RadarChart({ scores, dimensions }) {
                       {personalizedPlan.improvements.map((imp, i) => {
                         const planItem = (personalizedPlan.improvement_plan || []).find(p => p.dimension === imp.name);
                         return (
-                        <div key={i} className="border rounded-lg p-4">
+                        <div key={i} className="border rounded-xl p-4">
                           <div className="flex items-center justify-between mb-2">
                             <div className="font-medium">{imp.name} ({imp.score}分)</div>
                             <span className={`px-2 py-0.5 rounded text-xs ${
@@ -782,7 +940,7 @@ function RadarChart({ scores, dimensions }) {
                   </div>
                 </div>
                 
-                <div className="bg-yellow-50 rounded-lg p-4">
+                <div className="bg-yellow-50 rounded-xl p-4">
                   <div className="font-medium text-yellow-800 mb-1">📝 每周目标</div>
                   <div className="text-sm text-yellow-700">{personalizedPlan.weeklyGoal}</div>
                 </div>
@@ -812,7 +970,7 @@ function RadarChart({ scores, dimensions }) {
                 </div>
                 
                 {showLearningMaterial && (
-                  <div className="mb-6 bg-blue-50 rounded-lg p-4">
+                  <div className="mb-6 bg-blue-50 rounded-xl p-4">
                     <h3 className="font-medium text-blue-800 mb-2">📚 学习材料</h3>
                     <p className="text-sm text-blue-700">学习{currentTraining.dimension.name}的核心概念和实践方法...</p>
                     <button
@@ -829,7 +987,7 @@ function RadarChart({ scores, dimensions }) {
                     {(() => {
                       const scenario = currentTraining.scenarios[currentTraining.currentScenario];
                       return (
-                        <div className="bg-gray-50 rounded-lg p-4">
+                        <div className="bg-gray-50 rounded-xl p-4">
                           <div className="font-medium text-gray-800 mb-2">{scenario.title}</div>
                           <div className="text-gray-600 mb-4">{scenario.description}</div>
                           <div className="space-y-2">

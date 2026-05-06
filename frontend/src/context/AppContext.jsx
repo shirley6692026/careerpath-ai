@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useCallback } from 'react';
+import { authService } from '../services/auth';
 
 // CareerPath AI 全局状态管理
 // 打通各模块数据孤岛：简历 → JD → 面试 → 能力雷达
@@ -77,6 +78,17 @@ export function AppProvider({ children }) {
     }
   });
 
+  // ========== 登录状态 ==========
+  const [isLoggedIn, setIsLoggedIn] = useState(() => authService.isLoggedIn());
+  const [user, setUser] = useState(() => {
+    try {
+      const saved = localStorage.getItem('careerpath_user_info');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
+
   // ========== 能力雷达数据 ==========
   const [skillRadarData, setSkillRadarData] = useState(() => {
     try {
@@ -130,6 +142,26 @@ export function AppProvider({ children }) {
   const updateSkillRadarData = useCallback((updates) => {
     setSkillRadarData(prev => {
       const updated = { ...prev, ...updates, updatedAt: new Date().toISOString() };
+
+  // ========== 登录方法 ==========
+  const login = useCallback(async (email, code) => {
+    const result = await authService.login(email, code);
+    if (result.success) {
+      setIsLoggedIn(true);
+      setUser(result.user);
+      localStorage.setItem('careerpath_user_info', JSON.stringify(result.user));
+    }
+    return result;
+  }, []);
+
+  const logout = useCallback(() => {
+    authService.logout();
+    setIsLoggedIn(false);
+    setUser(null);
+    localStorage.removeItem('careerpath_user_info');
+  }, []);
+
+
       localStorage.setItem('careerpath_skill_radar', JSON.stringify(updated));
       return updated;
     });
@@ -141,11 +173,15 @@ export function AppProvider({ children }) {
     jdData,
     interviewData,
     skillRadarData,
+    isLoggedIn,
+    user,
     updateUserProfile,
     updateResumeData,
     updateJdData,
     updateInterviewData,
     updateSkillRadarData,
+    login,
+    logout,
   };
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

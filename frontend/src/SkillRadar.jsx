@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useAutoSave } from './hooks/useAutoSave';
 import { useAppContext } from './context/AppContext';
 import { skillRadar } from './services/api';
 
@@ -37,14 +38,14 @@ export default function SkillRadar() {
   const score = d?.match_score ?? 0;
 
   return (
-    <div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
       <div className="text-center mb-8">
         <h2 className="text-2xl font-bold text-slate-800">🎯 能力雷达</h2>
         <p className="text-slate-500 mt-1">分析你的技能与目标岗位的差距，发现你还没意识到的可迁移能力</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
           <div className="mb-4">
             <label className="font-semibold text-slate-700 block mb-1.5">🎯 目标岗位</label>
             <div className="flex gap-1.5 flex-wrap mb-2">
@@ -59,7 +60,7 @@ export default function SkillRadar() {
             </div>
             <input value={targetJob} onChange={(e) => setTargetJob(e.target.value)}
               placeholder="输入目标岗位名称..."
-              className="w-full p-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+              className="w-full p-3 border border-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
             />
           </div>
 
@@ -72,7 +73,7 @@ export default function SkillRadar() {
             )}
             <textarea value={skills} onChange={(e) => setSkills(e.target.value)}
               placeholder={'例如:\nPython, React, MySQL\n曾运营小红书账号 (5000粉丝)\n组织过50人的校园活动\n会用Figma画原型图'}
-              className="w-full h-44 p-3 border border-slate-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+              className="w-full h-44 p-3 border border-slate-100 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
             />
           </div>
 
@@ -91,7 +92,7 @@ export default function SkillRadar() {
           )}
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
           <h3 className="font-semibold text-slate-700 mb-4">📊 能力分析报告</h3>
 
           {!result && !loading && (

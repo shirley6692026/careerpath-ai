@@ -1,8 +1,11 @@
 // 学习路线图组件 - v2.0 with Real AI
 import { useState } from 'react';
+import { useAppContext } from '../context/AppContext';
 import { API_BASE } from '../services/api';
 
 export default function LearningRoadmap() {
+  const { skillRadarData, userProfile } = useAppContext();
+
   const [position, setPosition] = useState('');
   const [skills, setSkills] = useState('');
   const [result, setResult] = useState(null);
@@ -29,7 +32,7 @@ export default function LearningRoadmap() {
   const typeIcons = { course: '📚', book: '📖', project: '🚀', certificate: '🏆' };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50"><div className="max-w-4xl mx-auto p-6">
       <h2 className="text-2xl font-bold text-gray-900 mb-6">📚 学习路线</h2>
 
       <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 mb-8">
@@ -111,5 +114,6 @@ export default function LearningRoadmap() {
         </div>
       )}
     </div>
+      </div>
   );
 }

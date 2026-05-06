@@ -1,4 +1,6 @@
+import { useAppContext } from './context/AppContext';
 import { useState, useRef } from 'react';
+import { useAutoSave } from './hooks/useAutoSave';
 import { API_BASE } from './services/api';
 import { generateResumeHTML, parseResumeToStructured } from './ResumePDFTemplate';
 import html2pdf from 'html2pdf.js';
@@ -26,6 +28,8 @@ const MODULE_NAMES = {
 };
 
 export default function ResumeWorkshop() {
+  const { resumeData, updateResumeData, userProfile } = useAppContext();
+
   const [activeTab, setActiveTab] = useState('upload');
   const [resumeText, setResumeText] = useState('');
   const [parsedInfo, setParsedInfo] = useState(null);
@@ -336,7 +340,7 @@ export default function ResumeWorkshop() {
 
   // ========== 渲染 ==========
   return (
-    <div className="max-w-5xl mx-auto p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50"><div className="max-w-6xl mx-auto p-6">
       {/* 预览弹窗 */}
       {showPreview && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-start justify-center pt-4 pb-4">
@@ -1085,6 +1089,14 @@ export default function ResumeWorkshop() {
           </div>
         </div>
 
+    </div>
+      </div>
+    </div>
+    </div>
+    </div>
+    </div>
+    </div>
+    </div>
     </div>
   );
 }

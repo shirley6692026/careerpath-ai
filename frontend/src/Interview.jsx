@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { useAutoSave } from './hooks/useAutoSave';
 import { useAppContext } from './context/AppContext';
 
 const API_BASE = 'http://localhost:8000';
@@ -286,7 +287,7 @@ export default function Interview() {
     const s = summary;
     const isObj = s && typeof s === 'object' && !s._isPlainText && !s.raw_text;
     return (
-      <div className="animate-fadeIn max-w-3xl mx-auto">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50"><div className="animate-fadeIn max-w-4xl mx-auto">
         <div className="text-center mb-6">
           <h2 className="text-2xl font-bold text-slate-800">📊 面试总结报告</h2>
           <p className="text-slate-500 text-sm mt-1">
@@ -304,7 +305,7 @@ export default function Interview() {
         {isObj && (
           <div className="space-y-4">
             {/* Overall Score */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 text-center">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6 text-center">
               <div className="text-5xl font-bold" style={{color: (s.overall_score || 0) >= 7 ? '#16a34a' : (s.overall_score || 0) >= 4 ? '#ca8a04' : '#dc2626'}}>
                 {s.overall_score || 0}/10
               </div>
@@ -314,7 +315,7 @@ export default function Interview() {
 
             {/* Dimension Averages */}
             {s.dimension_averages && (
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+              <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
                 <h3 className="font-semibold text-slate-700 mb-3">📈 各维度平均分</h3>
                 <div className="grid grid-cols-2 gap-3">
                   {Object.entries(s.dimension_averages).map(([k, v]) => (
@@ -354,7 +355,7 @@ export default function Interview() {
 
             {/* Action Plan */}
             {s.action_plan && (
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+              <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
                 <h3 className="font-semibold text-slate-700 mb-3">🎯 改进计划</h3>
                 <div className="grid grid-cols-3 gap-3">
                   {s.action_plan.immediate && <PlanCard title="🟢 立即行动" content={s.action_plan.immediate} color="green" />}
@@ -381,7 +382,7 @@ export default function Interview() {
             </div>
 
             {/* Score History */}
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-5">
+            <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-5">
               <h3 className="font-semibold text-slate-700 mb-3">📝 各题得分</h3>
               <div className="space-y-2">
                 {history.map((h, i) => (
@@ -409,7 +410,7 @@ export default function Interview() {
 
         {/* Plain text fallback */}
         {s && (s._isPlainText || s.raw_text) && (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
             <div className="text-sm text-slate-700 whitespace-pre-wrap leading-relaxed">{s.raw_text || JSON.stringify(s, null, 2)}</div>
             <button onClick={() => { setShowSummary(false); setStep('setup'); }}
               className="mt-4 px-6 py-3 bg-blue-600 text-white rounded-xl font-semibold">🔄 再来一次</button>
@@ -424,7 +425,7 @@ export default function Interview() {
     const p = prepData;
     const isObj = p && typeof p === 'object' && !p._isPlainText && !p.raw_text;
     return (
-      <div className="animate-fadeIn max-w-3xl mx-auto">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50"><div className="animate-fadeIn max-w-4xl mx-auto">
         <div className="text-center mb-6">
           <h2 className="text-2xl font-bold text-slate-800">📋 面试全流程指南</h2>
           <p className="text-slate-500 text-sm mt-1">{position} · {domain || '不限'} · {company || '不限'}</p>
@@ -517,7 +518,7 @@ export default function Interview() {
         )}
 
         {p && (p._isPlainText || p.raw_text) && (
-          <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+          <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
             <div className="text-sm text-slate-700 whitespace-pre-wrap">{p.raw_text || JSON.stringify(p, null, 2)}</div>
           </div>
         )}
@@ -528,17 +529,17 @@ export default function Interview() {
   // ===== Setup View =====
   if (step === 'setup') {
     return (
-      <div className="animate-fadeIn">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50"><div className="animate-fadeIn">
         <div className="text-center mb-6">
           <h2 className="text-2xl font-bold text-slate-800">🤖 AI 模拟面试</h2>
           <p className="text-slate-500 text-sm mt-1">上传简历 → AI根据简历多框架出题 → 🎤 语音或文字回答 → 专业评分</p>
         </div>
-        <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border border-slate-100 p-6">
           {/* Resume Upload */}
           <div className="mb-4">
             <label className="font-semibold text-slate-700 block mb-1.5">📄 上传简历（推荐）</label>
             <div onClick={() => document.getElementById('resumeInput').click()}
-              className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${resumeFile ? 'border-green-300 bg-green-50' : 'border-slate-200 hover:border-blue-300'}`}>
+              className={`border-2 border-dashed rounded-xl p-4 text-center cursor-pointer transition-all ${resumeFile ? 'border-green-300 bg-green-50' : 'border-slate-100 hover:border-blue-300'}`}>
               <input id="resumeInput" type="file" accept=".docx" className="hidden"
                 onChange={(e) => e.target.files[0] && handleResumeUpload(e.target.files[0])} />
               {resumeFile ? (
@@ -573,7 +574,7 @@ export default function Interview() {
             <div>
               <label className="font-semibold text-slate-700 block mb-1.5">🎯 目标岗位</label>
               <input value={position} onChange={e => setPosition(e.target.value)}
-                placeholder="例：机械设计师" className="w-full p-3 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
+                placeholder="例：机械设计师" className="w-full p-3 border border-slate-100 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm" />
             </div>
             <div>
               <label className="font-semibold text-slate-700 block mb-1.5">🏢 公司</label>
@@ -592,7 +593,7 @@ export default function Interview() {
             <div className="flex gap-2">
               {Object.entries(MODE_DETAILS).map(([key, val]) => (
                 <button key={key} onClick={() => setMode(key)}
-                  className={`flex-1 p-3 rounded-xl border-2 text-left transition-all ${mode === key ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-slate-200 hover:border-blue-200'}`}>
+                  className={`flex-1 p-3 rounded-xl border-2 text-left transition-all ${mode === key ? 'border-blue-500 bg-blue-50 shadow-sm' : 'border-slate-100 hover:border-blue-200'}`}>
                   <p className="font-semibold text-sm">{val.label}</p>
                   <p className="text-[10px] text-slate-500 mt-0.5">{val.desc}</p>
                   <p className="text-[9px] text-slate-400 mt-0.5">{val.frameworks}</p>
@@ -613,7 +614,7 @@ export default function Interview() {
 
   // ===== Interview View =====
   return (
-    <div className="animate-fadeIn">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50"><div className="animate-fadeIn">
       <div className="text-center mb-6">
         <h2 className="text-2xl font-bold text-slate-800">🤖 AI 模拟面试</h2>
         <p className="text-slate-500 text-sm mt-1">
@@ -633,7 +634,7 @@ export default function Interview() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Question + Answer Panel */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
           {q && (
             <div className="animate-slideIn">
               <div className="flex items-center gap-2 mb-3 flex-wrap">
@@ -667,7 +668,7 @@ export default function Interview() {
             <textarea value={answer} onChange={e => setAnswer(e.target.value)}
               placeholder={isRecording ? '🎤 正在录音... 说话吧' : '输入你的回答，或点击🎤语音输入'}
               className={`w-full h-32 p-3 border rounded-lg resize-none focus:outline-none text-sm transition-all ${
-                isRecording ? 'border-red-300 bg-red-50' : 'border-slate-200 focus:ring-2 focus:ring-blue-500'
+                isRecording ? 'border-red-300 bg-red-50' : 'border-slate-100 focus:ring-2 focus:ring-blue-500'
               }`}
             />
             {isRecording && (
@@ -707,7 +708,7 @@ export default function Interview() {
         </div>
 
         {/* Feedback Panel */}
-        <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
+        <div className="bg-white rounded-xl shadow-sm border border-slate-100 p-6">
           <h3 className="font-semibold text-slate-700 mb-4">📊 面试反馈</h3>
 
           {!feedback && !loading && (
@@ -829,6 +830,10 @@ function InfoCard({ title, content }) {
     <div className="bg-slate-50 p-3 rounded-lg">
       <strong className="text-xs block mb-0.5">{title}</strong>
       <p className="text-xs text-slate-600">{content}</p>
+    </div>
+      </div>
+    </div>
+    </div>
     </div>
   );
 }

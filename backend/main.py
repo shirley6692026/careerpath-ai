@@ -8,6 +8,7 @@ from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn, json, os, re, time
+from datetime import datetime
 from pathlib import Path
 from PIL import Image
 import pytesseract
@@ -15,6 +16,7 @@ import cv2, docx
 import numpy as np
 from ark_client import client
 from resume_workshop_v3 import router as resume_router
+from auth_routes import router as auth_router
 
 app = FastAPI(title="CareerPath AI API", version="3.0.3")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
@@ -439,6 +441,7 @@ async def interview_preparation(data: dict):
     return {"success": True, "data": parsed or r["data"], "model_used": r["model_used"], "tokens": r["tokens"]}
 
 app.include_router(resume_router)
+app.include_router(auth_router)
 # ============ HAIC Coach API ============
 HAIC_PLAN_PROMPT = """你是HAIC(Human-AI Collaboration Index)人机协作指数教练。根据用户的5维评估结果生成个性化提升计划。返回JSON:
 {
@@ -783,3 +786,195 @@ if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
 
+
+
+# ===== 竞品分析 API =====
+@app.get("/api/competitive/analysis")
+async def competitive_analysis():
+    """
+    竞品深度分析 - 基于 Gartner Magic Quadrant 方法论
+    返回竞品对比数据和 CareerPath AI 定位分析
+    """
+    competitors = [
+        {
+            "id": "boss",
+            "name": "BOSS直聘",
+            "logo": "💼",
+            "category": "招聘平台",
+            "scores": {"matching": 90, "ai": 60, "interview": 40, "resume": 65, "career": 55, "haic": 0},
+            "strengths": ["岗位数量最多", "直聊模式高效", "AI职位推荐"],
+            "weaknesses": ["无面试训练", "无职业规划", "信息过载", "被动等待"],
+            "desc": "国内最大招聘平台，核心价值在'连接'，但不帮助候选人'提升'。AI主要用于匹配推荐，缺少主动赋能。"
+        },
+        {
+            "id": "nowcoder",
+            "name": "牛客网",
+            "logo": "🐮",
+            "category": "技能练习",
+            "scores": {"matching": 20, "ai": 40, "interview": 70, "resume": 30, "career": 20, "haic": 0},
+            "strengths": ["笔试题库丰富", "面经社区活跃", "公司真题"],
+            "weaknesses": ["模拟面试固定", "缺乏AI实时反馈", "无协作能力评估", "简历功能弱"],
+            "desc": "以题库和面经为核心，适合笔试刷题。但模拟面试是静态题库，没有AI实时互动和反馈。"
+        },
+        {
+            "id": "wondercv",
+            "name": "超级简历",
+            "logo": "📄",
+            "category": "简历工具",
+            "scores": {"matching": 30, "ai": 35, "interview": 0, "resume": 90, "career": 0, "haic": 0},
+            "strengths": ["简历模板专业", "ATS友好格式", "智能排版"],
+            "weaknesses": ["仅限简历优化", "无面试功能", "无职业导航", "单一维度"],
+            "desc": "专注简历优化，模板和排版确实不错。但求职不只是简历——缺少面试、规划、追踪等完整链路。"
+        },
+        {
+            "id": "chatgpt",
+            "name": "ChatGPT",
+            "logo": "🤖",
+            "category": "通用AI",
+            "scores": {"matching": 30, "ai": 95, "interview": 50, "resume": 70, "career": 60, "haic": 30},
+            "strengths": ["通用能力最强", "知识面广", "灵活应变"],
+            "weaknesses": ["无求职专项优化", "无评估体系", "数据不垂直", "需高质量提示词"],
+            "desc": "最强大的通用AI，但求职是垂直场景。需要用户自己设计提示词、构建工作流，缺乏专业评估和结构化引导。"
+        },
+        {
+            "id": "careerpath",
+            "name": "CareerPath AI",
+            "logo": "🚀",
+            "category": "AI求职系统（本产品）",
+            "scores": {"matching": 85, "ai": 90, "interview": 85, "resume": 85, "career": 90, "haic": 95},
+            "strengths": ["HAIC评估体系·独家", "6框架AI面试", "端到端闭环", "GROW教练对话", "9模块全覆盖"],
+            "weaknesses": ["用户规模尚小", "缺少企业侧数据", "移动端适配进行中"],
+            "desc": "首创HAIC人机协作指数，填补AI时代求职能力评估空白。唯一覆盖'评估→训练→追踪'全链路的AI求职系统。",
+            "highlight": True
+        }
+    ]
+    
+    dimensions = [
+        {"key": "matching", "label": "岗位匹配", "icon": "🎯"},
+        {"key": "ai", "label": "AI能力", "icon": "🧠"},
+        {"key": "interview", "label": "面试训练", "icon": "🤖"},
+        {"key": "resume", "label": "简历优化", "icon": "📄"},
+        {"key": "career", "label": "职业规划", "icon": "🧭"},
+        {"key": "haic", "label": "HAIC", "icon": "⭐", "exclusive": True}
+    ]
+    
+    # 计算 CareerPath AI 的综合优势
+    cp = next(c for c in competitors if c["id"] == "careerpath")
+    avg_scores = {k["key"]: sum(c["scores"][k["key"]] for c in competitors if c["id"] != "careerpath") / 4 for k in dimensions if k["key"] != "haic"}
+    
+    advantages = []
+    for dim in dimensions:
+        if dim["key"] == "haic":
+            advantages.append({
+                "dimension": "HAIC",
+                "careerpath_score": 95,
+                "market_avg": 7.5,  # (0+0+0+30)/4
+                "gap": 87.5,
+                "significance": "独家首创，市场空白"
+            })
+        else:
+            cp_score = cp["scores"][dim["key"]]
+            avg = avg_scores[dim["key"]]
+            gap = cp_score - avg
+            if gap > 10:
+                advantages.append({
+                    "dimension": dim["label"],
+                    "careerpath_score": cp_score,
+                    "market_avg": round(avg, 1),
+                    "gap": round(gap, 1),
+                    "significance": "领先" if gap > 20 else "持平"
+                })
+    
+    return {
+        "success": True,
+        "data": {
+            "competitors": competitors,
+            "dimensions": dimensions,
+            "advantages": advantages,
+            "market_position": {
+                "quadrant": "挑战者→领导者",
+                "x_axis": "AI能力",
+                "y_axis": "求职完成度",
+                "careerpath": {"x": 90, "y": 88},
+                "insight": "CareerPath AI在AI能力和求职完成度双维度领先，HAIC为独家差异化"
+            },
+            "generated_at": datetime.now().isoformat()
+        }
+    }
+
+
+# ===== HAIC AI教练对话 API =====
+@app.post("/api/haic/coach-chat")
+async def haic_coach_chat(body: dict):
+    """
+    HAIC AI教练对话 - 基于用户评估结果提供个性化指导
+    """
+    try:
+        message = body.get("message", "")
+        context = body.get("context", {})
+        history = body.get("history", [])
+        
+        # 构建系统提示
+        system_prompt = f"""你是CareerPath AI的HAIC教练，专门帮助用户提升人机协作能力。
+
+用户的HAIC评估结果:
+- 总分: {context.get('total', 0)}/100
+- 等级: {context.get('level', {}).get('level', '未知')}
+
+各维度得分:
+"""
+        
+        for dim in context.get("dimensions", []):
+            system_prompt += f"- {dim['name']}: {dim['score']}分\n"
+        
+        system_prompt += """
+你的职责:
+1. 根据用户的HAIC评估结果，提供针对性的建议
+2. 回答关于AI协作、提示工程、工作流优化等问题
+3. 鼓励用户，帮助他们建立信心
+4. 推荐具体的学习资源和实践方法
+
+回复要求:
+- 简洁明了，不超过200字
+- 使用中文
+- 语气友好、专业
+- 给出可执行的建议
+"""
+        
+        # 构建对话历史
+        messages = [{"role": "system", "content": system_prompt}]
+        
+        # 添加历史对话
+        for msg in history[-5:]:  # 最近5条
+            role = "user" if msg.get("role") == "user" else "assistant"
+            messages.append({"role": role, "content": msg.get("content", "")})
+        
+        # 添加当前消息
+        messages.append({"role": "user", "content": message})
+        
+        # 调用ARK API
+        from ark_client import client
+        response = await client.chat_completion(
+            messages=messages,
+            temperature=0.7,
+            max_tokens=500
+        )
+        
+        return {
+            "success": True,
+            "data": {
+                "response": response.get("content", "抱歉，我暂时无法回答。请稍后再试。"),
+                "model": response.get("model", "unknown"),
+                "tokens": response.get("tokens", {})
+            }
+        }
+        
+    except Exception as e:
+        print(f"[HAIC Coach] Error: {e}")
+        return {
+            "success": False,
+            "error": str(e),
+            "data": {
+                "response": "抱歉，AI教练暂时无法连接。请检查网络后重试，或使用页面上的学习资源。"
+            }
+        }
